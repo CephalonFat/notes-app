@@ -3,6 +3,24 @@
 // If nothing is saved yet, we start with an empty array [].
 let notes = JSON.parse(localStorage.getItem('my-notes') || '[]');
 
+// NEW CODE TO DISCUSS IN MEETING
+
+function exportNotes() {
+  // Turn the notes array into formatted text
+  const dataStr = JSON.stringify(notes, null, 2);
+
+  // Create a temporary invisible download link and click it
+  const blob = new Blob([dataStr], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'my-notes.json';
+  a.click();
+
+  // Clean up the temporary link
+  URL.revokeObjectURL(url);
+}
+
 // ── Draw all the notes on screen ──
 function renderNotes() {
   const list = document.getElementById('notes-list');
