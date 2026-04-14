@@ -6,9 +6,10 @@
 }
 
 body {
+  /* CHANGED: dark background like Notion's dark mode */
   font-family: 'Georgia', serif;
-  background-color: #f5f2eb;
-  color: #2c2c2c;
+  background-color: #191919;
+  color: #e8e8e8;
   min-height: 100vh;
   padding: 2rem 1rem;
 }
@@ -17,108 +18,158 @@ body {
 .container {
   max-width: 680px;
   margin: 0 auto;
+  /* CHANGED: more top padding so content sits lower on the page like Notion */
+  padding-top: 4rem;
 }
 
 /* ── Header ── */
 header {
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
 }
 
 h1 {
-  font-size: 2.2rem;
+  /* CHANGED: much larger font, lighter weight — this is the "New page" style */
+  font-size: 2.8rem;
   font-weight: normal;
-  letter-spacing: -0.5px;
-  color: #1a1a1a;
+  letter-spacing: -1px;
+  color: #e8e8e8;
 }
 
 .subtitle {
-  font-size: 0.95rem;
-  color: #888;
-  margin-top: 4px;
+  /* CHANGED: dimmer subtitle to match Notion's muted style */
+  font-size: 0.9rem;
+  color: #555;
+  margin-top: 6px;
 }
 
 /* ── Editor (the write area) ── */
 .editor {
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  padding: 1.25rem;
-  margin-bottom: 2rem;
+  /* CHANGED: no background, no border, no box — just open space like Notion */
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 3rem;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 #note-title {
   font-family: 'Georgia', serif;
-  font-size: 1rem;
+  /* CHANGED: larger title input, light color on dark background */
+  font-size: 1.4rem;
   border: none;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 8px;
+  border-bottom: 1px solid #2e2e2e;
+  padding-bottom: 10px;
   outline: none;
-  color: #2c2c2c;
+  color: #e8e8e8;
   background: transparent;
 }
 
 #note-title::placeholder {
-  color: #bbb;
+  /* CHANGED: very dim placeholder, like Notion's "Untitled" hint */
+  color: #3d3d3d;
 }
 
 #note-body {
   font-family: 'Georgia', serif;
-  font-size: 0.95rem;
+  font-size: 1rem;
   border: none;
   resize: vertical;
-  min-height: 120px;
+  min-height: 140px;
   outline: none;
-  line-height: 1.7;
-  color: #2c2c2c;
+  line-height: 1.8;
+  /* CHANGED: light text on dark background */
+  color: #c9c9c9;
   background: transparent;
 }
 
 #note-body::placeholder {
-  color: #bbb;
+  /* CHANGED: Notion's placeholder text is very subtle — almost invisible */
+  color: #3d3d3d;
 }
 
 #save-btn {
-  align-self: flex-end;
-  background: #2c2c2c;
-  color: #fff;
-  border: none;
-  padding: 8px 20px;
-  border-radius: 6px;
-  font-size: 0.9rem;
+  align-self: flex-start;
+  /* CHANGED: dark button that fits the theme — subtle, not flashy */
+  background: transparent;
+  color: #666;
+  border: 1px solid #333;
+  padding: 6px 16px;
+  border-radius: 5px;
+  font-size: 0.85rem;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s;
+}
+
+#export-btn {
+  align-self: flex-start;
+  /* CHANGED: dark button that fits the theme — subtle, not flashy */
+  background: transparent;
+  color: #666;
+  border: 1px solid #333;
+  padding: 6px 16px;
+  border-radius: 5px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+#export-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(216, 5, 5, 0.4);
+}
+
+#export-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 8px rgba(79, 70, 229, 0.3);
 }
 
 #save-btn:hover {
-  background: #444;
+transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+}
+
+/* ── Divider between editor and saved notes ── */
+.editor::after {
+  content: '';
+  display: block;
+  height: 1px;
+  background: #272727;
+  margin-top: 1rem;
 }
 
 /* ── Notes list ── */
 .empty-state {
-  text-align: center;
-  color: #aaa;
+  text-align: left;
+  /* CHANGED: very dim empty state text */
+  color: #3d3d3d;
   font-size: 0.9rem;
-  padding: 2rem 0;
+  padding: 1rem 0;
 }
 
 .note-card {
-  background: #fff;
-  border: 1px solid #e8e4da;
-  border-radius: 10px;
-  padding: 1.1rem 1.25rem;
-  margin-bottom: 1rem;
+  /* CHANGED: no white box — cards blend into the dark background */
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #272727;
+  border-radius: 0;
+  padding: 1.1rem 0;
+  margin-bottom: 0;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
-  transition: border-color 0.2s;
+  transition: background 0.15s;
 }
 
 .note-card:hover {
-  border-color: #ccc;
+  /* CHANGED: subtle hover highlight on the whole row */
+  background: #1f1f1f;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 6px;
 }
 
 .note-content {
@@ -126,43 +177,46 @@ h1 {
 }
 
 .note-card-title {
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: bold;
   margin-bottom: 4px;
-  color: #1a1a1a;
+  /* CHANGED: bright white for titles so they stand out */
+  color: #e8e8e8;
 }
 
 .note-card-body {
-  font-size: 0.9rem;
-  color: #555;
+  font-size: 0.875rem;
+  /* CHANGED: dimmer body text — secondary information */
+  color: #666;
   line-height: 1.6;
   white-space: pre-wrap;
 }
 
 .note-card-date {
   font-size: 0.75rem;
-  color: #bbb;
-  margin-top: 8px;
+  /* CHANGED: very dim date — least important info */
+  color: #444;
+  margin-top: 6px;
 }
 
 .delete-btn {
   background: transparent;
-  border: 1px solid #eee;
-  color: #bbb;
+  border: none;
+  /* CHANGED: barely visible delete button until hovered */
+  color: #333;
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 1.1rem;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.2s;
+  transition: all 0.15s;
 }
 
 .delete-btn:hover {
-  background: #fff0f0;
-  border-color: #f5c6c6;
-  color: #c0392b;
+  background: #2e1a1a;
+  color: #e05252;
 }
