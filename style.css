@@ -123,7 +123,7 @@ h1 {
 
 #export-btn:active {
   transform: translateY(0);
-  box-shadow: 0 3px 8px rgba(79, 70, 229, 0.3);
+  box-shadow: 0 3px 8px rgba(228, 51, 6, 0.3);
 }
 
 #save-btn:hover {
@@ -199,24 +199,72 @@ transform: translateY(-2px);
   margin-top: 6px;
 }
 
-.delete-btn {
-  background: transparent;
-  border: none;
-  /* CHANGED: barely visible delete button until hovered */
-  color: #333;
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1.1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+
+/* ── Dropdown menu system ── */
+
+/* NEW CODE TO DISCUSS */
+
+.menu-wrapper {
+  position: relative;
   flex-shrink: 0;
-  transition: all 0.15s;
 }
 
-.delete-btn:hover {
-  background: #2e1a1a;
-  color: #e05252;
+.menu-btn {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 1.3rem;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.menu-btn:hover {
+  background: #2a2a2a;
+  color: #d8d8d8;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 34px;
+  right: 0;
+  min-width: 180px;
+  background: #202020;
+  border: 1px solid #2e2e2e;
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.45);
+  overflow: hidden;
+  z-index: 50;
+}
+
+.dropdown-menu button {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #faf9f9;
+  text-align: left;
+  padding: 12px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.dropdown-menu button:hover {
+  background: #2c2c2c;
+}
+
+.dropdown-menu button:first-child:hover {
+  color: #ff6b6b;
+}
+
+.dropdown-menu button:nth-child(2):hover {
+  color: #ff6be6;
+}
+
+.dropdown-menu button:nth-child(3):hover {
+  color: #6bdcff;
+}
 }
