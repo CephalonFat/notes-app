@@ -2,28 +2,52 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>My Notes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=100.0" />
+  <title>Note Taker</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <div class="container">
+
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <h2 class="sidebar-title">All Notes</h2>
+
+    <!-- Font selector DISCUSS -->
+<div class="font-selector">
+  <label class="font-label">Font style</label>
+  <select id="font-select" onchange="changeFont(this.value)">
+    <option value="'Georgia', serif">Georgia (default)</option>
+    <option value="'Arial', sans-serif">Arial</option>
+    <option value="'Courier New', monospace">Courier New</option>
+    <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+    <option value="'Times New Roman', serif">Times New Roman</option>
+    
+  </select>
+</div>
+    <div id="notes-list" class="notes-list"></div>
+  </aside>
+
+  <!-- Main editor -->
+  <main class="main-content">
     <header>
-      <h1>My Notes</h1>
+      <h1>Your Notes</h1>
       <p class="subtitle">Your personal notebook</p>
     </header>
 
     <div class="editor">
       <input type="text" id="note-title" placeholder="Note title (optional)" />
       <textarea id="note-body" placeholder="Write your note here..."></textarea>
-      <button id="save-btn" onclick="saveNote()">Save note</button>
-      <button id ="export-btn" onclick="exportNotes()">Export notes</button>
+
+      <button id="save-btn" onclick="saveNote()">Save Note</button>
+      <button id="export-btn" onclick="exportNotes()">Export Notes</button>
     </div>
+  </main>
 
-    <div id="notes-list"></div>
-  </div>
+</div>
+<script src="script.js"></script>
 
-  <script src="script.js"></script>
 </body>
 </html>
