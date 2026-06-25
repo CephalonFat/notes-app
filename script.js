@@ -1,69 +1,178 @@
-// ── Load saved notes from the browser's localStorage ──
-// JSON.parse turns the saved text back into a JavaScript array.
-// If nothing is saved yet, we start with an empty array [].
 let notes = JSON.parse(localStorage.getItem('my-notes') || '[]');
+let activeNoteIndex = null;
 
-// NEW CODE TO DISCUSS IN MEETING
+// ── Font changer ── DISCUSS
+// This function runs every time the user picks a new font.
+// It changes the CSS variable --app-font on the root element,
+// which instantly updates every font-family: var(--app-font) on the page.
+function changeFont(fontValue) {
+  document.documentElement.style.setProperty('--app-font', fontValue);
 
-function exportNotes() {
-  // Turn the notes array into formatted text
-  const dataStr = JSON.stringify(notes, null, 2);
-
-  // Create a temporary invisible download link and click it
-  const blob = new Blob([dataStr], { type: 'application/Text' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = 'my notes.txt';
-  a.click();
-
-  // Clean up the temporary link
-  URL.revokeObjectURL(url);
+  // Save the choice to localStorage so it persists after refresh
+  localStorage.setItem('preferred-font', fontValue);
 }
 
+// ── Load saved font on startup ──
+// When the page loads, check if the user previously picked a font.
+// If yes, apply it and set the dropdown to match.
+function loadSavedFont() {
+  const savedFont = localStorage.getItem('preferred-font');
 
-// new render notes to go over
+  if (savedFont) {
+    // Apply the font to the page
+    document.documentElement.style.setProperty('--app-font', savedFont);
 
+    // Set the dropdown to show the right option
+    document.getElementById('font-select').value = savedFont;
+  }
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.menu-wrapper')) {
+    document.querySelectorAll('.dropdown-menu').forEach(menu => {
+      menu.style.display = 'none';
+    });
+  }
+});
+
+// ── Render sidebar notes ──
 function renderNotes() {
   const list = document.getElementById('notes-list');
 
   if (notes.length === 0) {
-    list.innerHTML = '<p class="empty-state">No notes yet — write something above!</p>';
+    list.innerHTML = '<p class="empty-state">No notes yet</p>';
     return;
   }
 
   list.innerHTML = notes.map((note, index) => `
-    <div class="note-card">
+    <div class="sidebar-note" onclick="loadNote(${index})">
+      
+      <div class="sidebar-note-header">
 
-      <div class="note-content">
-        ${note.title ? `<p class="note-card-title">${escapeHTML(note.title)}</p>` : ''}
-        <p class="note-card-body">${escapeHTML(note.body)}</p>
-        <p class="note-card-date">${note.date}</p>
-      </div>
+        <p class="sidebar-note-title">
+          ${note.title || 'Untitled'}
+        </p>
 
-      <div class="menu-wrapper">
-        <button class="menu-btn" onclick="toggleMenu(${index})">⋮</button>
+        <div class="menu-wrapper">
+          <button 
+            class="menu-btn"
+            onclick="event.stopPropagation(); toggleMenu(${index})"
+          >
+            ⋮
+          </button>
 
-        <div class="dropdown-menu" id="menu-${index}">
-          <button onclick="deleteNote(${index})">Delete Saved Note</button>
-          <button onclick="exportSingleNote(${index})">Export Note</button>
-          <button onclick="editNote(${index})">Edit Note</button>
+          <div class="dropdown-menu" id="menu-${index}">
+            <button onclick="event.stopPropagation(); deleteNote(${index})">
+              Delete
+            </button>
+            <button onclick="event.stopPropagation(); exportSingleNote(${index})">
+              Export
+            </button>
+          </div>
         </div>
+
       </div>
+
+      <p class="sidebar-note-preview">
+        ${note.body.substring(0, 40)}...
+      </p>
 
     </div>
   `).join('');
 }
 
+
 function toggleMenu(index) {
   const menu = document.getElementById(`menu-${index}`);
 
-  document.querySelectorAll('.dropdown-menu').forEach(item => {
-    if (item !== menu) item.style.display = 'none';
+  document.querySelectorAll('.dropdown-menu').forEach(m => {
+    if (m !== menu) m.style.display = 'none';
   });
 
   menu.style.display =
     menu.style.display === 'block' ? 'none' : 'block';
+}
+
+
+// ── Load note into editor (edit mode) ──
+function loadNote(index) {
+  const note = notes[index];
+
+  document.getElementById('note-title').value = note.title;
+  document.getElementById('note-body').value = note.body;
+
+  activeNoteIndex = index;
+
+  document.getElementById('save-btn').textContent = 'Update Note';
+}
+
+// ── Save or update note ──
+function saveNote(index) {
+  const titleInput = document.getElementById('note-title');
+  const bodyInput  = document.getElementById('note-body');
+
+  const title = titleInput.value.trim();
+  const body  = bodyInput.value.trim();
+
+  if (!body) {
+    alert("Note body can't be empty"); // new alert has been added
+    return;
+  }
+
+  const newNote = {
+    title: title,
+    body: body,
+    date: new Date().toLocaleString()
+  };
+
+  if (activeNoteIndex !== null) {
+    // update existing
+    notes[activeNoteIndex] = newNote;
+  } else {
+    // create new
+    notes.unshift(newNote);
+  }
+
+  localStorage.setItem('my-notes', JSON.stringify(notes));
+
+  // reset editor
+  titleInput.value = '';
+  bodyInput.value = '';
+  activeNoteIndex = null;
+
+  document.getElementById('save-btn').textContent = 'Save Note';
+
+  renderNotes();
+}
+
+// ── Delete note ──
+function deleteNote(index) {
+  notes.splice(index, 1);
+  localStorage.setItem('my-notes', JSON.stringify(notes));
+
+  // reset editor if needed
+  if (activeNoteIndex === index) {
+    document.getElementById('note-title').value = '';
+    document.getElementById('note-body').value = '';
+    activeNoteIndex = null;
+  }
+
+  renderNotes();
+}
+
+// ── Export all notes ──
+function exportNotes(index) {
+  const dataStr = JSON.stringify(notes, null, 2);
+
+  const blob = new Blob([dataStr], { type: 'text/plain' });
+  const url  = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'my-notes.txt';
+  a.click();
+
+  URL.revokeObjectURL(url);
 }
 
 function exportSingleNote(index) {
@@ -90,125 +199,11 @@ function exportSingleNote(index) {
   URL.revokeObjectURL(url);
 }
 
-
-
-
-
-
-
-
-
-// original render notes
-
-//function renderNotes() {
-//  const list = document.getElementById('notes-list');
-//
-//  // If there are no notes, show a friendly empty message
-//  if (notes.length === 0) {
-//    list.innerHTML = '<p class="empty-state">No notes yet — write something above!</p>';
-//    return;
-//  }
-//
-//  // Otherwise, loop through every note and build an HTML card for it
-//  // .map() goes through each note and returns a chunk of HTML
-//  // .join('') glues all those chunks into one big string
-//  list.innerHTML = notes.map((note, index) => `
-//    <div class="note-card">
-//      <div class="note-content">
-//        ${note.title ? `<p class="note-card-title">${escapeHTML(note.title)}</p>` : ''}
-//        <p class="note-card-body">${escapeHTML(note.body)}</p>
-//        <p class="note-card-date">${note.date}</p>
-//      </div>
-//      <button class="delete-btn" onclick="deleteNote(${index})" title="Delete note">×</button>
-//    </div>
-//  `).join('');
-//}
-
-// ── Save a new note ──
-function saveNote() {
-  const titleInput = document.getElementById('note-title');
-  const bodyInput  = document.getElementById('note-body');
-
-  const title = titleInput.value.trim();
-  const body  = bodyInput.value.trim();
-
-  // Don't save if the body is empty
-  if (!body) return;
-
-  // Create a new note object and add it to the front of the array
-  // unshift() adds to the beginning so newest notes appear first
-  notes.unshift({
-    title: title,
-    body:  body,
-    date:  new Date().toLocaleString()
-  });
-
-  // Save the updated array to localStorage
-  // JSON.stringify turns the array into text so it can be stored
-  localStorage.setItem('my-notes', JSON.stringify(notes));
-
-  // Clear the input fields
-  titleInput.value = '';
-  bodyInput.value  = '';
-
-  // Re-draw the notes list
-  renderNotes();
-}
-
-// ── Delete a note by its position in the array ──
-function deleteNote(index) {
-  // splice(index, 1) removes 1 item at the given position
-  notes.splice(index, 1);
-  localStorage.setItem('my-notes', JSON.stringify(notes));
-  renderNotes();
-}
-
-// MORE CODE TO DISCUSS
-
-function editNote(index) {
-  const note = notes[index];
-
-  document.getElementById('note-title').value = note.title;
-  document.getElementById('note-body').value = note.body;
-
-  notes.splice(index, 1);
-
-  localStorage.setItem('my-notes', JSON.stringify(notes));
-
-  renderNotes();
-
-  document.getElementById('note-body').focus();
-}
-
-
-
-// ── Safety helper: escapeHTML ──
-// This prevents a bug where if someone types <script> in a note,
-// the browser would try to run it. This function makes it display
-// as plain text instead. Always do this when displaying user input!
-function escapeHTML(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-// ── Keyboard shortcut: Ctrl + Enter to save ──
+// ── Keyboard shortcut ──
 document.getElementById('note-body').addEventListener('keydown', function(e) {
   if (e.ctrlKey && e.key === 'Enter') saveNote();
 });
 
-
-// NEW CODE TO DISCUSS IN MEETING
-
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('.menu-wrapper')) {
-    document.querySelectorAll('.dropdown-menu').forEach(menu => {
-      menu.style.display = 'none';
-    });
-  }
-});
-
-// ── Run renderNotes() once when the page first loads ──
+// ── Initial render ──
 renderNotes();
+loadSavedFont(); // this will load the font on startup
