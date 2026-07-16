@@ -3,27 +3,86 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>My Notes</title>
+  <title>Note Taker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display&family=Inter&family=Lato&family=Merriweather&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <div class="container">
+
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <h2 class="sidebar-title">All Notes</h2>
+
+      <!-- Font selector DISCUSS -->
+  <div class="font-selector">
+    <label class="font-label">Font style</label>
+    <select id="font-select" onchange="changeFont(this.value)">
+      <option value="'Georgia', serif">Georgia (default)</option>
+      <option value="'Arial', sans-serif">Arial</option>
+      <option value="'Courier New', monospace">Courier New</option>
+      <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+      <option value="'Times New Roman', serif">Times New Roman</option>
+      <option value="'Playfair Display', serif">Playfair Display</option>
+      <option value="'Inter', sans-serif">Inter</option>
+      <option value="'Lato', sans-serif">Lato</option>
+      <option value="'Merriweather', serif">Merriweather</option>
+      <option value="'Comic Sans MS', cursive">Comic Sans</option>
+    </select>
+  </div>
+
+  <!-- Font size selector -->
+  <div class="font-selector">
+    <label class="font-label">Font size</label>
+    <select id="font-size-select" onchange="changeFontSize(this.value)">
+      <option value="0.8rem">Small</option>
+      <option value="1rem" selected>Medium (default)</option>
+      <option value="1.2rem">Large</option>
+      <option value="1.5rem">Extra Large</option>
+    </select>
+  </div>
+
+  <!-- Text colour selector -->
+<!-- Text colour selector -->
+  <div class="font-selector">
+    <label class="font-label">Text colour</label>
+    <div class="colour-options" id="colour-options"></div>
+  </div>
+  <input
+    type="color"
+    id="custom-colour"
+    hidden
+    onchange="chooseCustomColour(this.value)"
+>
+
+<button id="more-colours-btn">
+   + More colours
+</button>
+  <div id="notes-list" class="notes-list"></div>
+</aside>
+  <!-- Main editor -->
+  <main class="main-content">
     <header>
-      <h1>My Notes</h1>
+      <h1>Your Notes</h1>
       <p class="subtitle">Your personal notebook</p>
     </header>
 
     <div class="editor">
+
       <input type="text" id="note-title" placeholder="Note title (optional)" />
       <textarea id="note-body" placeholder="Write your note here..."></textarea>
-      <button id="save-btn" onclick="saveNote()">Save note</button>
-      <button id ="export-btn" onclick="exportNotes()">Export notes</button>
+
+      <button id="new-note-btn" onclick="newNote()">New Note</button>
+      <button id="export-btn" onclick="exportNotes()">Export Notes</button>
     </div>
+  </main>
 
-    <div id="notes-list"></div>
-  </div>
+</div>
+<script src="script.js"></script>
 
-  <script src="script.js"></script>
 </body>
 </html>
