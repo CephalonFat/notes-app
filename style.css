@@ -56,7 +56,7 @@ h1 {
 }
 
 #note-title {
-  font-family: 'Georgia', serif;
+  font-family: var(--app-font);
   /* CHANGED: larger title input, light color on dark background */
   font-size: 1.4rem;
   border: none;
@@ -73,7 +73,7 @@ h1 {
 }
 
 #note-body {
-  font-family: 'Georgia', serif;
+  font-family: var(--app-font);
   font-size: 1rem;
   border: none;
   resize: vertical;
@@ -205,8 +205,9 @@ transform: translateY(-2px);
 /* NEW CODE TO DISCUSS */
 
 .menu-wrapper {
-  position: relative;
-  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  position: relative; /* add relative here aswell as absolute below, so it anchors the menu */
 }
 
 .menu-btn {
@@ -228,7 +229,7 @@ transform: translateY(-2px);
 
 .dropdown-menu {
   display: none;
-  position: absolute;
+  position: absolute; /* must remain absolute */
   top: 34px;
   right: 0;
   min-width: 180px;
@@ -244,7 +245,7 @@ transform: translateY(-2px);
   width: 100%;
   background: transparent;
   border: none;
-  color: #faf9f9;
+  color: #c0c0c0;
   text-align: left;
   padding: 12px 14px;
   font-size: 0.85rem;
@@ -264,7 +265,180 @@ transform: translateY(-2px);
   color: #ff6be6;
 }
 
-.dropdown-menu button:nth-child(3):hover {
-  color: #6bdcff;
+/* NEW SIDEBAR CODE */
+
+/* ── App layout ── */
+.app-layout {
+  display: flex;
+  height: 100vh;
 }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 260px;
+  background: #171717;
+  border-right: 1px solid #2a2a2a;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.sidebar-title {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 1rem;
+}
+
+/* ── Main content ── */
+.main-content {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.sidebar-note {
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 6px;
+  transition: background 0.15s;
+}
+
+.sidebar-note-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.sidebar-note:hover {
+  background: #202020;
+}
+
+.sidebar-note-title {
+  font-size: 0.85rem;
+  color: #e8e8e8;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sidebar-note-preview {
+  font-size: 0.0rem;
+  color: #555;
+}
+
+/* ── Font selector DISCUSS ── */
+
+.font-selector {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.font-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #555;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.font-selector select {
+  width: 100%;
+  background: #202020;
+  color: #c0c0c0;
+  border: 1px solid #2e2e2e;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.font-selector select:hover {
+  border-color: #444;
+}
+
+.font-selector select:focus {
+  border-color: #5a5a5a;
+}
+
+/* ── Dropdown options styling ── */
+#font-size-select option {
+  background: #202020;
+  color: #c0c0c0;
+}
+
+#font-select option {
+  background: #202020;
+  color: #ffffff;
+}
+
+/* ── Colour picker ── */
+.colour-options {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 9px;
+  column-gap: 9px;
+  margin-top: 4px;
+}
+
+.colour-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.colour-btn:hover {
+  transform: scale(1.2);
+}
+
+/* When a colour is selected, show a white ring around it */
+.colour-btn.active {
+  border-color: #ffffff;
+  transform: scale(1.15);
+}
+
+#more-colours-btn {
+  margin-top: 10px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid #2e2e2e;
+  color: #c0c0c0;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#more-colours-btn:hover {
+  background: #202020;
+  border-color: #444;
+}
+
+#new-note-btn {
+    align-self: flex-start;
+    background: transparent;
+    color: #666;
+    border: 1px solid #333;
+    padding: 6px 16px;
+    border-radius: 5px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 12px;
+}
+
+#new-note-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
 }
