@@ -349,6 +349,11 @@ function loadNote(index) {
     renderColourButtons();
     renderNotes();
 
+    // Auto-close sidebar drawer on mobile devices when a note is opened
+    if (window.innerWidth <= 768 && !sidebarCollapsed) {
+        toggleSidebar();
+    }
+
     isLoadingNote = false;
 }
 
@@ -840,16 +845,22 @@ function applyModalColor() {
     closeColorPickerModal();
 }
 
-let sidebarCollapsed = localStorage.getItem("sidebarCollapsed") === "true";
+// Check saved preference or default to collapsed on mobile screens (<= 768px)
+let savedSidebarState = localStorage.getItem("sidebarCollapsed");
+let sidebarCollapsed = savedSidebarState !== null ? savedSidebarState === "true" : window.innerWidth <= 768;
 
+/**
+ * Toggles the sidebar visibility between open and collapsed states.
+ * Updates DOM classes, toggle button indicator arrow, and persists preference.
+ */
 function toggleSidebar() {
     sidebarCollapsed = !sidebarCollapsed;
 
     const sidebar = document.querySelector(".sidebar");
     const button = document.getElementById("sidebar-toggle");
 
-    sidebar.classList.toggle("collapsed", sidebarCollapsed);
-    button.textContent = sidebarCollapsed ? "❯" : "❮";
+    if (sidebar) sidebar.classList.toggle("collapsed", sidebarCollapsed);
+    if (button) button.textContent = sidebarCollapsed ? "❯" : "❮";
 
     localStorage.setItem("sidebarCollapsed", sidebarCollapsed);
 }
@@ -869,9 +880,9 @@ const button = document.getElementById("sidebar-toggle");
 
 if (sidebarCollapsed) {
     document.querySelector(".sidebar").classList.add("collapsed");
-    button.textContent = "❯";
+    if (button) button.textContent = "❯";
 } else {
-    button.textContent = "❮";
+    if (button) button.textContent = "❮";
 }
 
 // Settings Modal Backdrop Click
