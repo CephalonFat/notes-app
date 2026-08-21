@@ -19,7 +19,13 @@ let saveTimeout;
 let bulletsEnabled  = false;
 let currentBullet   = '•';
 
+// List of user-created notes from local storage
 let notes = JSON.parse(localStorage.getItem('my-notes') || '[]');
+
+// Sidebar sub-sections list and collapsed state tracker
+let sections = JSON.parse(localStorage.getItem('my-sections') || '["General"]');
+let collapsedSections = JSON.parse(localStorage.getItem('collapsed-sections') || '{}');
+let activeSection = 'General';
 
 const defaultColoursLight = [
     "#37352f", "#787774", "#d44c47", "#d9730d",
@@ -357,6 +363,10 @@ function loadNote(index) {
     isLoadingNote = false;
 }
 
+/**
+ * Saves current note content to localStorage and updates sidebar list.
+ * Preserves custom formatting (font, size, colour) and sub-section branch.
+ */
 function saveNote() {
     const title = document.getElementById('note-title').value.trim();
     const bodyEl = document.getElementById('note-body');
@@ -365,13 +375,19 @@ function saveNote() {
 
     if (!bodyText && !bodyHtml.includes('<img')) return;
 
+    // Retain existing assigned section or use currently active section
+    const existingSection = (activeNoteIndex !== null && notes[activeNoteIndex]) 
+        ? (notes[activeNoteIndex].section || 'General') 
+        : (activeSection || 'General');
+
     const noteToSave = {
         title:    title,
         body:     bodyHtml,
         date:     new Date().toLocaleString(),
         font:     currentFont,
         fontSize: currentFontSize,
-        colour:   currentColour
+        colour:   currentColour,
+        section:  existingSection
     };
 
     if (activeNoteIndex === null) {
@@ -481,26 +497,273 @@ function escapeHtml(str) {
         .replace(/'/g, "&#039;");
 }
 
+/**
+ * Prompts the user to create a new sub-section branch in the sidebar.
+ * Adds the new section name to localStorage and refreshes the sidebar view.
+ */
+function promptCreateSection() {
+    const name = window.prompt('Enter new section name:');
+    if (!name) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+
+    if (!sections.includes(trimmed)) {
+        sections.push(trimmed);
+        localStorage.setItem('my-sections', JSON.stringify(sections));
+        renderNotes();
+    }
+}
+
+/**
+ * Toggles a section's collapsed/expanded visibility state.
+ * @param {string} sectionName - The section name to toggle.
+ */
+function toggleSectionCollapse(sectionName) {
+    collapsedSections[sectionName] = !collapsedSections[sectionName];
+    localStorage.setItem('collapsed-sections', JSON.stringify(collapsedSections));
+    renderNotes();
+}
+
+// Variable to track the index of currently dragged note
+let draggedNoteIndex = null;
+
+/**
+ * Handles the start of a drag event on a sidebar note.
+ * Stores note index in dataTransfer and applies dragging visual state.
+ * @param {DragEvent} event - The HTML drag event.
+ * @param {number} index - The index of the note being dragged.
+ */
+function handleNoteDragStart(event, index) {
+    draggedNoteIndex = index;
+    event.dataTransfer.setData('text/plain', index.toString());
+    event.dataTransfer.effectAllowed = 'move';
+    if (event.currentTarget) {
+        event.currentTarget.classList.add('dragging');
+    }
+}
+
+/**
+ * Handles the end of a drag event on a sidebar note.
+ * Cleans up temporary dragging and drag-over visual indicator styles.
+ * @param {DragEvent} event - The HTML drag event.
+ */
+function handleNoteDragEnd(event) {
+    if (event.currentTarget) {
+        event.currentTarget.classList.remove('dragging');
+    }
+    document.querySelectorAll('.sidebar-section.drag-over').forEach(sec => {
+        sec.classList.remove('drag-over');
+    });
+    draggedNoteIndex = null;
+}
+
+/**
+ * Handles dragover on a section dropzone to allow dropping.
+ * Prevents default browser handling and highlights the target section.
+ * @param {DragEvent} event - The HTML drag event.
+ * @param {string} sectionName - The name of the target section.
+ */
+function handleSectionDragOver(event, sectionName) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    const sectionEl = document.getElementById(`section-${sectionName}`);
+    if (sectionEl) {
+        sectionEl.classList.add('drag-over');
+    }
+}
+
+/**
+ * Handles dragleave from a section dropzone.
+ * Removes visual highlight when cursor leaves the section boundaries.
+ * @param {DragEvent} event - The HTML drag event.
+ * @param {string} sectionName - The name of the target section.
+ */
+function handleSectionDragLeave(event, sectionName) {
+    const sectionEl = document.getElementById(`section-${sectionName}`);
+    if (sectionEl && !sectionEl.contains(event.relatedTarget)) {
+        sectionEl.classList.remove('drag-over');
+    }
+}
+
+/**
+ * Handles dropping a dragged note onto a target section.
+ * Reassigns the note's section, uncollapses the target section, and persists changes.
+ * @param {DragEvent} event - The HTML drag event.
+ * @param {string} sectionName - The name of the destination section.
+ */
+function handleSectionDrop(event, sectionName) {
+    event.preventDefault();
+    const sectionEl = document.getElementById(`section-${sectionName}`);
+    if (sectionEl) {
+        sectionEl.classList.remove('drag-over');
+    }
+
+    const indexStr = event.dataTransfer.getData('text/plain');
+    const noteIndex = indexStr !== '' ? parseInt(indexStr, 10) : draggedNoteIndex;
+
+    if (noteIndex !== null && !isNaN(noteIndex) && noteIndex >= 0 && noteIndex < notes.length) {
+        // Update note's section assignment
+        notes[noteIndex].section = sectionName;
+        // Auto-expand destination section so the user sees their moved note
+        collapsedSections[sectionName] = false;
+
+        localStorage.setItem('my-notes', JSON.stringify(notes));
+        localStorage.setItem('collapsed-sections', JSON.stringify(collapsedSections));
+        renderNotes();
+    }
+}
+
+/**
+ * Prompts user to rename an existing section.
+ * Updates all notes currently filed under this section.
+ * @param {string} oldName - The existing section name.
+ */
+function promptRenameSection(oldName) {
+    if (oldName === 'General') return;
+    const newName = window.prompt(`Rename section "${oldName}" to:`, oldName);
+    if (!newName) return;
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+
+    // Update section in sections list
+    const secIndex = sections.indexOf(oldName);
+    if (secIndex !== -1) {
+        sections[secIndex] = trimmed;
+    }
+
+    // Update notes section property
+    notes.forEach(n => {
+        if ((n.section || 'General') === oldName) {
+            n.section = trimmed;
+        }
+    });
+
+    // Update collapsed state key
+    if (collapsedSections[oldName] !== undefined) {
+        collapsedSections[trimmed] = collapsedSections[oldName];
+        delete collapsedSections[oldName];
+    }
+
+    localStorage.setItem('my-sections', JSON.stringify(sections));
+    localStorage.setItem('my-notes', JSON.stringify(notes));
+    localStorage.setItem('collapsed-sections', JSON.stringify(collapsedSections));
+    renderNotes();
+}
+
+/**
+ * Confirms deletion of a section. Notes inside are moved to the General section.
+ * @param {string} sectionName - The section name to delete.
+ */
+function confirmDeleteSection(sectionName) {
+    if (sectionName === 'General') return;
+    const confirmed = window.confirm(`Delete section "${sectionName}"? Notes inside will be moved to General.`);
+    if (!confirmed) return;
+
+    sections = sections.filter(s => s !== sectionName);
+    notes.forEach(n => {
+        if (n.section === sectionName) {
+            n.section = 'General';
+        }
+    });
+
+    delete collapsedSections[sectionName];
+
+    localStorage.setItem('my-sections', JSON.stringify(sections));
+    localStorage.setItem('my-notes', JSON.stringify(notes));
+    localStorage.setItem('collapsed-sections', JSON.stringify(collapsedSections));
+    renderNotes();
+}
+
+/**
+ * Creates a new blank note filed under a specific section.
+ * @param {string} sectionName - The section name for the new note.
+ */
+function promptCreateNoteInSection(sectionName) {
+    activeSection = sectionName;
+    newNote();
+}
+
+/**
+ * Renders notes organized into collapsible sub-sections in the sidebar.
+ * Notes are grouped by their `section` property. Includes section controls
+ * (collapse/expand, rename, delete) and note options (delete, export, drag & drop).
+ */
 function renderNotes() {
     const list = document.getElementById('notes-list');
     if (!list) return;
 
-    if (notes.length === 0) {
-        list.innerHTML = '<p class="empty-state">No notes yet</p>';
-        return;
+    // Ensure 'General' is always in the sections list
+    if (!sections.includes('General')) {
+        sections.unshift('General');
     }
 
-    list.innerHTML = notes.map((note, index) => {
-        const isActive = index === activeNoteIndex;
+    // Collect any extra sections present on notes that might not be in sections list
+    notes.forEach(n => {
+        const sec = n.section || 'General';
+        if (!sections.includes(sec)) {
+            sections.push(sec);
+        }
+    });
+
+    // Save consolidated sections list
+    localStorage.setItem('my-sections', JSON.stringify(sections));
+
+    // Group notes by section
+    const grouped = {};
+    sections.forEach(s => grouped[s] = []);
+    notes.forEach((note, index) => {
+        const sec = note.section || 'General';
+        if (!grouped[sec]) grouped[sec] = [];
+        grouped[sec].push({ note, index });
+    });
+
+    list.innerHTML = sections.map(sectionName => {
+        const sectionNotes = grouped[sectionName] || [];
+        const isCollapsed = Boolean(collapsedSections[sectionName]);
+        const safeSectionName = escapeHtml(sectionName);
+
         return `
-            <div class="sidebar-note ${isActive ? 'active' : ''}" onclick="loadNote(${index})">
-                <span class="sidebar-note-title">${escapeHtml(note.title || 'Untitled')}</span>
-                <div class="menu-wrapper">
-                    <button class="menu-btn" onclick="event.stopPropagation(); toggleMenu(${index})" title="Options">⋮</button>
-                    <div class="dropdown-menu" id="menu-${index}">
-                        <button onclick="event.stopPropagation(); deleteNote(${index})">Delete</button>
-                        <button onclick="event.stopPropagation(); exportSingleNote(${index})">Export</button>
+            <div class="sidebar-section ${isCollapsed ? 'collapsed' : ''}" 
+                 id="section-${safeSectionName}"
+                 ondragover="handleSectionDragOver(event, '${safeSectionName}')"
+                 ondragleave="handleSectionDragLeave(event, '${safeSectionName}')"
+                 ondrop="handleSectionDrop(event, '${safeSectionName}')">
+                <div class="section-header" onclick="toggleSectionCollapse('${safeSectionName}')">
+                    <div class="section-title-group">
+                        <span class="section-toggle-icon">▾</span>
+                        <span class="section-title">${safeSectionName}</span>
+                        <span class="section-count">${sectionNotes.length}</span>
                     </div>
+                    <div class="section-actions" onclick="event.stopPropagation()">
+                        <button class="section-icon-btn" onclick="promptCreateNoteInSection('${safeSectionName}')" title="Add note to ${safeSectionName}">+</button>
+                        ${sectionName !== 'General' ? `
+                            <button class="section-icon-btn" onclick="promptRenameSection('${safeSectionName}')" title="Rename section">✎</button>
+                            <button class="section-icon-btn" onclick="confirmDeleteSection('${safeSectionName}')" title="Delete section">×</button>
+                        ` : ''}
+                    </div>
+                </div>
+                <div class="section-notes-container">
+                    ${sectionNotes.length === 0 ? `
+                        <p class="empty-state" style="padding: 4px 8px; font-size: 0.78rem;">Empty section (drop notes here)</p>
+                    ` : sectionNotes.map(({ note, index }) => {
+                        const isActive = index === activeNoteIndex;
+                        return `
+                            <div class="sidebar-note ${isActive ? 'active' : ''}" 
+                                 draggable="true"
+                                 ondragstart="handleNoteDragStart(event, ${index})"
+                                 ondragend="handleNoteDragEnd(event)"
+                                 onclick="loadNote(${index})">
+                                <span class="sidebar-note-title">${escapeHtml(note.title || 'Untitled')}</span>
+                                <div class="menu-wrapper">
+                                    <button class="menu-btn" onclick="event.stopPropagation(); toggleMenu(${index})" title="Options">⋮</button>
+                                    <div class="dropdown-menu" id="menu-${index}">
+                                        <button onclick="event.stopPropagation(); deleteNote(${index})">Delete Note</button>
+                                        <button onclick="event.stopPropagation(); exportSingleNote(${index})">Export Note</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
             </div>
         `;
@@ -591,14 +854,15 @@ function handleFileImport(event) {
             formattedBody = escapeHtml(fileContent).replace(/\r\n|\r|\n/g, '<br>');
         }
 
-        // Create new imported note object with default font and color settings
+        // Create new imported note object with default font, color, and section settings
         const importedNote = {
             title: fileName,
             body: formattedBody,
             date: new Date().toLocaleString(),
             font: "'Georgia', serif",
             fontSize: "1rem",
-            colour: getDefaultColour()
+            colour: getDefaultColour(),
+            section: activeSection || 'General'
         };
 
         // Add imported note to the top of the notes list array
