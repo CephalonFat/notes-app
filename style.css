@@ -191,6 +191,31 @@ body {
   padding: 2.5rem 3rem;
   overflow-y: auto;
   transition: all 0.25s ease;
+  position: relative;
+}
+
+/* ── App Launch Version Badge (Top Right Corner) ── */
+.app-version-badge {
+  position: absolute;
+  top: 2rem;
+  right: 2.5rem;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  padding: 5px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  letter-spacing: 0.05em;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.app-version-badge:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background: var(--bg-hover-strong);
 }
 
 #sidebar-toggle {
@@ -1155,3 +1180,268 @@ input:checked + .slider:before {
 .primary-btn:hover {
   opacity: 0.9;
 }
+
+/* ──────────────────────────────────────────────────────────
+   MOBILE & TABLET RESPONSIVE STYLES
+   Optimizes layout, sidebar drawer, touch targets, and typography for mobile screens
+   ────────────────────────────────────────────────────────── */
+
+/* Mobile Sidebar Backdrop */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  /* App layout container */
+  .app-layout {
+    position: relative;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  /* Mobile Slide-in Drawer Sidebar */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 1000;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
+    transform: translateX(0);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Hidden sidebar on mobile translates off-screen */
+  .sidebar.collapsed {
+    transform: translateX(-100%);
+    width: 280px;
+    padding: 1.25rem 1rem;
+    box-shadow: none;
+  }
+
+  /* Show backdrop when mobile sidebar is open */
+  .sidebar:not(.collapsed) ~ .sidebar-backdrop {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Main editor content on mobile */
+  .main-content {
+    padding: 1rem 1.1rem;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Sidebar toggle button on mobile */
+  #sidebar-toggle {
+    margin-bottom: 0.75rem;
+    padding: 6px 12px;
+    font-size: 1.25rem;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Header and title proportions on mobile */
+  header {
+    margin-bottom: 1.25rem;
+  }
+
+  h1 {
+    font-size: 1.85rem;
+    letter-spacing: -0.5px;
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+  }
+
+  /* Version badge in top right on mobile */
+  .app-version-badge {
+    top: 1rem;
+    right: 1rem;
+    font-size: 0.8rem;
+    padding: 3px 10px;
+  }
+
+  /* Editor container */
+  .editor {
+    margin-bottom: 2rem;
+    gap: 10px;
+  }
+
+  #note-title {
+    font-size: 1.15rem;
+    padding-bottom: 6px;
+  }
+
+  /* Editor toolbar and dropdowns on mobile */
+  .editor-tools {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .toolbar-left {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .bullet-wrapper {
+    position: relative;
+  }
+
+  #bullet-btn, #bullet-style-btn, #font-btn, #font-size-btn {
+    font-size: 0.82rem;
+    padding: 6px 10px;
+    min-height: 36px;
+  }
+
+  /* Color picker toolbar on mobile */
+  .editor-colour-picker {
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .colour-options {
+    flex-shrink: 0;
+  }
+
+  .colour-btn {
+    width: 24px;
+    height: 24px;
+  }
+
+  #more-colours-btn {
+    min-width: 32px;
+    min-height: 32px;
+  }
+
+  /* Note text body on mobile */
+  #note-body {
+    min-height: 250px;
+    font-size: 0.98rem;
+    line-height: 1.6;
+  }
+
+  /* Action buttons row on mobile */
+  .editor-action-row {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 1rem;
+  }
+
+  #save-btn, #export-btn, #new-note-btn, #import-btn {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 130px;
+    text-align: center;
+    padding: 10px 12px;
+    font-size: 0.85rem;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .export-wrapper {
+    flex: 1 1 calc(50% - 4px);
+  }
+
+  #export-btn {
+    width: 100%;
+  }
+
+  /* Settings modal on mobile */
+  .settings-dialog {
+    width: 95vw;
+    max-height: 88vh;
+    border-radius: 12px;
+  }
+
+  .settings-body {
+    flex-direction: column;
+    height: auto;
+    max-height: 65vh;
+  }
+
+  .settings-tabs {
+    flex-direction: row;
+    width: 100%;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+    padding: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab-btn {
+    white-space: nowrap;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+  .settings-content {
+    padding: 1rem;
+  }
+
+  .theme-card-group {
+    flex-direction: column;
+  }
+
+  .setting-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .settings-select {
+    width: 100%;
+  }
+
+  /* Custom Color picker dialog on mobile */
+  .color-picker-dialog {
+    width: 92vw;
+    max-width: 360px;
+  }
+
+  .preset-swatches {
+    gap: 10px;
+  }
+
+  .swatch-btn {
+    width: 34px;
+    height: 34px;
+  }
+}
+
