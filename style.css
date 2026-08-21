@@ -497,17 +497,151 @@ h1 {
   border-color: var(--border-strong);
 }
 
-/* ── Claude-style Sidebar Notes ── */
+/* ── Claude-style Sidebar Notes & Sub-sections ── */
 .sidebar-header {
-  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px;
   margin-bottom: 0.5rem;
 }
 
 .sidebar-title {
   font-size: 0.82rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-secondary);
   letter-spacing: 0.02em;
+}
+
+.add-section-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.add-section-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+/* ── Sidebar Sub-sections (Branches / Folders) ── */
+.sidebar-section {
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  border: 1.5px dashed transparent;
+  border-radius: 8px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  padding: 2px;
+}
+
+/* Active drop target highlight when dragging notes */
+.sidebar-section.drag-over {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-bg);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+  color: var(--text-secondary);
+}
+
+.section-header:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.section-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.section-toggle-icon {
+  font-size: 0.7rem;
+  transition: transform 0.2s ease;
+  width: 14px;
+  display: inline-block;
+  text-align: center;
+}
+
+.sidebar-section.collapsed .section-toggle-icon {
+  transform: rotate(-90deg);
+}
+
+.section-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section-count {
+  font-size: 0.72rem;
+  color: var(--text-placeholder);
+  background: var(--bg-hover-strong);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.section-header:hover .section-actions {
+  opacity: 1;
+}
+
+.section-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.section-icon-btn:hover {
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
+}
+
+.section-notes-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 6px;
+  margin-top: 2px;
+}
+
+.sidebar-section.collapsed .section-notes-container {
+  display: none;
 }
 
 .notes-list {
@@ -530,11 +664,22 @@ h1 {
   padding: 8px 10px;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
   min-height: 36px;
   gap: 8px;
   color: var(--text-secondary);
   background: transparent;
+  user-select: none;
+}
+
+.sidebar-note[draggable="true"] {
+  cursor: grab;
+}
+
+.sidebar-note.dragging {
+  opacity: 0.35;
+  cursor: grabbing !important;
+  background: var(--bg-hover-strong);
 }
 
 .sidebar-note:hover {
@@ -1443,5 +1588,14 @@ input:checked + .slider:before {
     width: 34px;
     height: 34px;
   }
-}
 
+  /* Make section action buttons always visible and touch-accessible on mobile */
+  .section-actions {
+    opacity: 1;
+  }
+
+  .section-icon-btn {
+    padding: 4px 6px;
+    font-size: 0.85rem;
+  }
+}
