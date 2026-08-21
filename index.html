@@ -6,8 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Draftly</title>
 
-  <!-- Custom Browser Tab Favicon for Draftly (Using Flag_France.png) -->
-  <link rel="icon" type="image/png" href="Flag_France.png">
+  <!-- Custom Modern Capital 'D' Favicon for Draftly -->
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%231a1918'/><path d='M34 26 H50 C64 26 74 36 74 50 C74 64 64 74 50 74 H34 V26 Z' fill='none' stroke='%23ffffff' stroke-width='11' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,8 +26,10 @@
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-top">
+        <!-- Sidebar Header with Recents title and Add Section Button -->
         <div class="sidebar-header">
           <span class="sidebar-title">Recents</span>
+          <button id="add-section-btn" class="add-section-btn" onclick="promptCreateSection()" title="Create new sub-section">+ Section</button>
         </div>
 
         <div id="notes-list" class="notes-list"></div>
@@ -55,7 +58,7 @@
     <main class="main-content">
 
       <!-- Launch Version Badge (Top Right Corner) -->
-      <div class="app-version-badge" title="Draftly Launch Version">v1.0</div>
+      <div class="app-version-badge" title="Draftly Launch Version">v1.1</div>
 
       <button id="sidebar-toggle" onclick="toggleSidebar()">
         ❮
