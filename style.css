@@ -1347,7 +1347,7 @@ input:checked + .slider:before {
   pointer-events: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-height: 550px) and (orientation: landscape), (max-width: 1024px) and (orientation: landscape) and (hover: none) and (pointer: coarse) {
   /* App layout container */
   .app-layout {
     position: relative;
@@ -1597,5 +1597,132 @@ input:checked + .slider:before {
   .section-icon-btn {
     padding: 4px 6px;
     font-size: 0.85rem;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────
+   MOBILE LANDSCAPE COMPACT STYLES
+   Compresses spacing, headers, and toolbars when phone is rotated horizontally
+   ────────────────────────────────────────────────────────── */
+@media (max-height: 550px) and (orientation: landscape) {
+  .main-content {
+    padding: 0.6rem 1rem;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  /* Compact inline header */
+  header {
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  h1 {
+    font-size: 1.3rem;
+    line-height: 1.2;
+  }
+
+  .subtitle {
+    font-size: 0.75rem;
+    margin-top: 0;
+  }
+
+  /* Compact top-right badge */
+  .app-version-badge {
+    top: 0.6rem;
+    right: max(1rem, env(safe-area-inset-right));
+    font-size: 0.72rem;
+    padding: 2px 8px;
+  }
+
+  /* Sidebar toggle button in landscape */
+  #sidebar-toggle {
+    margin-bottom: 0.4rem;
+    padding: 4px 8px;
+    font-size: 1rem;
+  }
+
+  /* Compact editor container */
+  .editor {
+    margin-bottom: 1.25rem;
+    gap: 8px;
+  }
+
+  #note-title {
+    font-size: 1.05rem;
+    padding-bottom: 4px;
+  }
+
+  /* Horizontal toolbar in landscape */
+  .editor-tools {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .toolbar-left {
+    width: auto;
+    gap: 4px;
+  }
+
+  #bullet-btn, #bullet-style-btn, #font-btn, #font-size-btn {
+    font-size: 0.78rem;
+    padding: 4px 8px;
+    min-height: 30px;
+  }
+
+  .editor-colour-picker {
+    width: auto;
+  }
+
+  .colour-btn {
+    width: 20px;
+    height: 20px;
+  }
+
+  #more-colours-btn {
+    min-width: 26px;
+    min-height: 26px;
+    font-size: 0.75rem;
+  }
+
+  /* Editor text area in landscape */
+  #note-body {
+    min-height: 160px;
+    font-size: 0.95rem;
+  }
+
+  /* Compact action buttons row */
+  .editor-action-row {
+    margin-top: 0.6rem;
+    gap: 6px;
+  }
+
+  #save-btn, #export-btn, #new-note-btn, #import-btn {
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    min-width: 100px;
+  }
+
+  /* Compact modal dialogs in landscape */
+  .settings-dialog {
+    max-height: 94vh;
+    max-height: 94dvh;
+    width: 90vw;
+  }
+
+  .settings-body {
+    max-height: 52vh;
+  }
+
+  .color-picker-dialog {
+    max-height: 92vh;
+    max-height: 92dvh;
   }
 }
