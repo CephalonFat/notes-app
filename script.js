@@ -355,8 +355,8 @@ function loadNote(index) {
     renderColourButtons();
     renderNotes();
 
-    // Auto-close sidebar drawer on mobile devices when a note is opened
-    if (window.innerWidth <= 768 && !sidebarCollapsed) {
+    // Auto-close sidebar drawer on mobile devices or phone landscape when a note is opened
+    if (isMobileViewport() && !sidebarCollapsed) {
         toggleSidebar();
     }
 
@@ -1109,9 +1109,23 @@ function applyModalColor() {
     closeColorPickerModal();
 }
 
-// Check saved preference or default to collapsed on mobile screens (<= 768px)
+/**
+ * Determines whether the current device/viewport is in a mobile or landscape-constrained view.
+ * Checks viewport width, height (for phone landscape), and touch/pointer characteristics.
+ * @returns {boolean} True if in mobile or phone landscape mode.
+ */
+function isMobileViewport() {
+    const isNarrow = window.innerWidth <= 768;
+    const isShortLandscape = window.innerHeight <= 550 && window.innerWidth <= 1024;
+    const isTouchLandscape = window.matchMedia('(orientation: landscape)').matches && 
+                             window.matchMedia('(hover: none) and (pointer: coarse)').matches && 
+                             window.innerWidth <= 1024;
+    return isNarrow || isShortLandscape || isTouchLandscape;
+}
+
+// Check saved preference or default to collapsed on mobile screens / phone landscape
 let savedSidebarState = localStorage.getItem("sidebarCollapsed");
-let sidebarCollapsed = savedSidebarState !== null ? savedSidebarState === "true" : window.innerWidth <= 768;
+let sidebarCollapsed = savedSidebarState !== null ? savedSidebarState === "true" : isMobileViewport();
 
 /**
  * Toggles the sidebar visibility between open and collapsed states.
