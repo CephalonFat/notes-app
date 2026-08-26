@@ -1356,13 +1356,13 @@ input:checked + .slider:before {
     overflow: hidden;
   }
 
-  /* Mobile Slide-in Drawer Sidebar */
+  /* Mobile Slide-in Drawer Sidebar with Safe Area Inset Protection for Dynamic Island and Notch */
   .sidebar {
     position: fixed;
     top: 0;
     left: 0;
     bottom: 0;
-    width: 280px;
+    width: 290px;
     max-width: 85vw;
     height: 100vh;
     height: 100dvh;
@@ -1370,12 +1370,17 @@ input:checked + .slider:before {
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
     transform: translateX(0);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Dynamic top padding specifically clearance for iPhone Dynamic Island, Notch, and Status Bar */
+    padding-top: max(2.75rem, calc(env(safe-area-inset-top) + 1.25rem));
+    padding-left: max(1.1rem, calc(env(safe-area-inset-left) + 0.5rem));
+    padding-right: max(1.1rem, env(safe-area-inset-right));
+    padding-bottom: max(1.5rem, calc(env(safe-area-inset-bottom) + 0.75rem));
   }
 
   /* Hidden sidebar on mobile translates off-screen */
   .sidebar.collapsed {
     transform: translateX(-100%);
-    width: 280px;
+    width: 290px;
     padding: 1.25rem 1rem;
     box-shadow: none;
   }
@@ -1387,9 +1392,12 @@ input:checked + .slider:before {
     pointer-events: auto;
   }
 
-  /* Main editor content on mobile */
+  /* Main editor content on mobile with safe area insets */
   .main-content {
-    padding: 1rem 1.1rem;
+    padding-top: max(1.5rem, calc(env(safe-area-inset-top) + 0.75rem));
+    padding-left: max(1.1rem, calc(env(safe-area-inset-left) + 0.5rem));
+    padding-right: max(1.1rem, calc(env(safe-area-inset-right) + 0.5rem));
+    padding-bottom: max(1.5rem, calc(env(safe-area-inset-bottom) + 0.75rem));
     width: 100%;
     height: 100vh;
     height: 100dvh;
@@ -1426,8 +1434,8 @@ input:checked + .slider:before {
 
   /* Version badge in top right on mobile */
   .app-version-badge {
-    top: 1rem;
-    right: 1rem;
+    top: max(1rem, calc(env(safe-area-inset-top) + 0.5rem));
+    right: max(1rem, calc(env(safe-area-inset-right) + 0.5rem));
     font-size: 0.8rem;
     padding: 3px 10px;
   }
@@ -1605,10 +1613,17 @@ input:checked + .slider:before {
    Compresses spacing, headers, and toolbars when phone is rotated horizontally
    ────────────────────────────────────────────────────────── */
 @media (max-height: 550px) and (orientation: landscape) {
+  /* Sidebar safe area insets in landscape */
+  .sidebar {
+    padding-top: max(1.25rem, calc(env(safe-area-inset-top) + 0.5rem));
+    padding-left: max(1.25rem, calc(env(safe-area-inset-left) + 0.75rem));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
   .main-content {
     padding: 0.6rem 1rem;
-    padding-left: max(1rem, env(safe-area-inset-left));
-    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-left: max(1rem, calc(env(safe-area-inset-left) + 0.5rem));
+    padding-right: max(1rem, calc(env(safe-area-inset-right) + 0.5rem));
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 
