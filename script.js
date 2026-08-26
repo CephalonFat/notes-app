@@ -1,1188 +1,1728 @@
-let currentTheme = localStorage.getItem('theme') || 'light';
-let currentAccent = localStorage.getItem('accent') || 'blue';
-let currentLineHeight = localStorage.getItem('lineHeight') || '1.8';
-let currentPageWidth = localStorage.getItem('pageWidth') || '680px';
-let currentSpellcheck = localStorage.getItem('spellcheck') !== 'false';
-
-function getDefaultColour() {
-    if (currentTheme === 'dark') return '#e8e8e8';
-    if (currentTheme === 'sepia') return '#433422';
-    return '#37352f';
+/* ── Theme custom properties (Notion Light, Dark, Sepia) ── */
+:root {
+  /* Default: Notion Light Mode */
+  --bg-body: #ffffff;
+  --bg-sidebar: #f7f6f3;
+  --bg-hover: #efefed;
+  --bg-hover-strong: #e5e5e2;
+  --bg-dropdown: #ffffff;
+  --text-primary: #37352f;
+  --text-secondary: #787774;
+  --text-muted: #9b9a97;
+  --text-placeholder: #c3c2be;
+  --border-color: #e9e9e8;
+  --border-subtle: #f0f0ef;
+  --border-strong: #d3d3d0;
+  --btn-bg: #ffffff;
+  --btn-border: #d3d3d0;
+  --btn-hover: #efefed;
+  --btn-text: #37352f;
+  --shadow-dropdown: 0 8px 24px rgba(15, 15, 15, 0.12);
+  --color-active-ring: #37352f;
+  --accent-blue: #2383e2;
+  --accent-blue-bg: rgba(35, 131, 226, 0.08);
+  --app-font: 'Georgia', serif;
+  --line-height: 1.8;
+  --page-max-width: 680px;
+  color-scheme: light;
 }
 
-let currentFont     = "'Georgia', serif";
-let currentFontSize = "1rem";
-let currentColour   = getDefaultColour();
-let isLoadingNote   = false;
-let activeNoteIndex = null;
-let saveTimeout;
-let bulletsEnabled  = false;
-let currentBullet   = '•';
-
-// List of user-created notes from local storage
-let notes = JSON.parse(localStorage.getItem('my-notes') || '[]');
-
-// Sidebar sub-sections list and collapsed state tracker
-let sections = JSON.parse(localStorage.getItem('my-sections') || '["General"]');
-let collapsedSections = JSON.parse(localStorage.getItem('collapsed-sections') || '{}');
-let activeSection = 'General';
-
-const defaultColoursLight = [
-    "#37352f", "#787774", "#d44c47", "#d9730d",
-    "#cb912f", "#448361", "#337ea9", "#9065b0"
-];
-
-const defaultColoursDark = [
-    "#e8e8e8", "#999999", "#ff6b6b", "#ff9f43",
-    "#feca57", "#1dd1a1", "#54a0ff", "#5f27cd"
-];
-
-let recentColours = JSON.parse(localStorage.getItem("recentColours")) || 
-    (currentTheme === 'dark' ? defaultColoursDark : defaultColoursLight);
-
-function setTheme(theme) {
-    currentTheme = theme;
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-
-    ['light', 'dark', 'sepia'].forEach(t => {
-        const btn = document.getElementById(`theme-card-${t}`);
-        if (btn) btn.classList.toggle('active', t === theme);
-    });
-
-    if (currentColour === '#c9c9c9' || currentColour === '#e8e8e8' || currentColour === '#37352f' || currentColour === '#433422') {
-        currentColour = getDefaultColour();
-        document.getElementById('note-title').style.color = currentColour;
-        document.getElementById('note-body').style.color  = currentColour;
-    }
-
-    renderColourButtons();
-    renderNotes();
+[data-theme="dark"] {
+  /* Notion Dark Mode */
+  --bg-body: #191919;
+  --bg-sidebar: #202020;
+  --bg-hover: #2c2c2c;
+  --bg-hover-strong: #353535;
+  --bg-dropdown: #252525;
+  --text-primary: #e8e8e8;
+  --text-secondary: #999999;
+  --text-muted: #666666;
+  --text-placeholder: #444444;
+  --border-color: #2e2e2e;
+  --border-subtle: #272727;
+  --border-strong: #444444;
+  --btn-bg: transparent;
+  --btn-border: #333333;
+  --btn-hover: #2a2a2a;
+  --btn-text: #c9c9c9;
+  --shadow-dropdown: 0 10px 24px rgba(0,0,0,0.45);
+  --color-active-ring: #ffffff;
+  --accent-blue: #6b6bf0;
+  --accent-blue-bg: rgba(107, 107, 240, 0.15);
+  color-scheme: dark;
 }
 
-function setAccentColor(accent) {
-    currentAccent = accent;
-    document.documentElement.setAttribute('data-accent', accent);
-    localStorage.setItem('accent', accent);
-
-    document.querySelectorAll('.accent-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.accent === accent);
-    });
+[data-theme="sepia"] {
+  /* Notion Warm Sepia Mode */
+  --bg-body: #f4ebd9;
+  --bg-sidebar: #e8ddc7;
+  --bg-hover: #decfae;
+  --bg-hover-strong: #d2c19c;
+  --bg-dropdown: #f4ebd9;
+  --text-primary: #433422;
+  --text-secondary: #766347;
+  --text-muted: #947e5e;
+  --text-placeholder: #b5a181;
+  --border-color: #d8c6a7;
+  --border-subtle: #e2d2b5;
+  --border-strong: #bfac89;
+  --btn-bg: #f4ebd9;
+  --btn-border: #d8c6a7;
+  --btn-hover: #decfae;
+  --btn-text: #433422;
+  --shadow-dropdown: 0 8px 24px rgba(67, 52, 34, 0.15);
+  --color-active-ring: #433422;
+  --accent-blue: #b25900;
+  --accent-blue-bg: rgba(178, 89, 0, 0.12);
+  color-scheme: light;
 }
 
-function changeLineHeight(val) {
-    currentLineHeight = val;
-    document.documentElement.style.setProperty('--line-height', val);
-    localStorage.setItem('lineHeight', val);
-    const select = document.getElementById('settings-line-height-select');
-    if (select) select.value = val;
+/* Accent Color Variants */
+[data-accent="purple"] {
+  --accent-blue: #8a2be2;
+  --accent-blue-bg: rgba(138, 43, 226, 0.1);
+}
+[data-accent="green"] {
+  --accent-blue: #2e7d32;
+  --accent-blue-bg: rgba(46, 125, 50, 0.1);
+}
+[data-accent="orange"] {
+  --accent-blue: #d9730d;
+  --accent-blue-bg: rgba(217, 115, 13, 0.1);
+}
+[data-accent="pink"] {
+  --accent-blue: #d81b60;
+  --accent-blue-bg: rgba(216, 27, 96, 0.1);
 }
 
-function changePageWidth(val) {
-    currentPageWidth = val;
-    document.documentElement.style.setProperty('--page-max-width', val);
-    localStorage.setItem('pageWidth', val);
-    const select = document.getElementById('settings-width-select');
-    if (select) select.value = val;
+/* ── Reset & base ── */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-function setDefaultBulletStyle(style) {
-    setBulletStyle(style);
-    const select = document.getElementById('settings-bullet-select');
-    if (select) select.value = style;
+body {
+  font-family: var(--app-font);
+  background-color: var(--bg-body);
+  color: var(--text-primary);
+  min-height: 100vh;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-function toggleSpellcheck(enabled) {
-    currentSpellcheck = enabled;
-    document.getElementById('note-title').spellcheck = enabled;
-    document.getElementById('note-body').spellcheck = enabled;
-    localStorage.setItem('spellcheck', enabled);
-    const toggle = document.getElementById('settings-spellcheck-toggle');
-    if (toggle) toggle.checked = enabled;
+/* ── App layout ── */
+.app-layout {
+  display: flex;
+  height: 100vh;
 }
 
-// ─────────────────────────────────────────
-// SETTINGS MODAL DIALOG
-// ─────────────────────────────────────────
-
-function openSettingsModal() {
-    const modal = document.getElementById('settings-modal');
-    if (modal) modal.showModal();
+/* ── Sidebar ── */
+.sidebar {
+  width: 260px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-color);
+  padding: 1.25rem 1rem;
+  overflow-y: auto;
+  transition: width 0.3s ease, padding 0.3s ease, border-color 0.25s ease, background-color 0.25s ease;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
-function closeSettingsModal() {
-    const modal = document.getElementById('settings-modal');
-    if (modal) modal.close();
+.sidebar.collapsed {
+  width: 0;
+  padding: 0;
+  border-right: none;
 }
 
-function switchSettingsTab(tabName) {
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.tab === tabName);
-    });
-    document.querySelectorAll('.tab-panel').forEach(panel => {
-        panel.classList.toggle('active', panel.id === `tab-${tabName}`);
-    });
+.sidebar-top {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
-function clearAllNotes() {
-    if (confirm("Are you sure you want to delete ALL notes? This action cannot be undone.")) {
-        notes = [];
-        localStorage.removeItem('my-notes');
-        newNote();
-        renderNotes();
-        closeSettingsModal();
-    }
+.sidebar-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 1.25rem;
 }
 
-// ─────────────────────────────────────────
-// STYLE CHANGERS
-// ─────────────────────────────────────────
-
-const fontNamesMap = {
-    "'Georgia', serif": "Georgia",
-    "'Inter', sans-serif": "Inter",
-    "'Arial', sans-serif": "Arial",
-    "'Courier New', monospace": "Courier New",
-    "'Trebuchet MS', sans-serif": "Trebuchet",
-    "'Times New Roman', serif": "Times New Roman",
-    "'Playfair Display', serif": "Playfair Display",
-    "'Lato', sans-serif": "Lato",
-    "'Merriweather', serif": "Merriweather",
-    "'Comic Sans MS', cursive": "Comic Sans"
-};
-
-const fontSizeNamesMap = {
-    "0.8rem": "Small",
-    "1rem": "Medium",
-    "1.2rem": "Large",
-    "1.5rem": "Extra Large"
-};
-
-// ─────────────────────────────────────────
-// INLINE PER-CHARACTER / SELECTION FORMATTING
-// ─────────────────────────────────────────
-
-function applyInlineStyle(styleProp, value) {
-    const editor = document.getElementById('note-body');
-    if (!editor) return;
-    editor.focus();
-
-    const selection = window.getSelection();
-    if (!selection || !selection.rangeCount) return;
-
-    document.execCommand('styleWithCSS', false, true);
-
-    if (styleProp === 'color') {
-        document.execCommand('foreColor', false, value);
-    } else if (styleProp === 'fontFamily') {
-        document.execCommand('fontName', false, value);
-    } else if (styleProp === 'fontSize') {
-        const range = selection.getRangeAt(0);
-        if (range.collapsed) {
-            const span = document.createElement('span');
-            span.style.fontSize = value;
-            span.innerHTML = '&#8203;';
-            range.insertNode(span);
-            range.setStartAfter(span);
-            range.setEndAfter(span);
-            selection.removeAllRanges();
-            selection.addRange(range);
-        } else {
-            const span = document.createElement('span');
-            span.style.fontSize = value;
-            try {
-                span.appendChild(range.extractContents());
-                range.insertNode(span);
-            } catch (e) {
-                document.execCommand('fontSize', false, '7');
-                const fontEls = editor.querySelectorAll('font[size="7"]');
-                fontEls.forEach(el => {
-                    el.removeAttribute('size');
-                    el.style.fontSize = value;
-                });
-            }
-        }
-    }
-
-    scheduleAutoSave();
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
 }
 
-function changeFont(fontValue) {
-    currentFont = fontValue;
-    const fontBtn = document.getElementById('font-btn');
-    if (fontBtn) fontBtn.textContent = (fontNamesMap[fontValue] || 'Font') + ' ▾';
-
-    applyInlineStyle('fontFamily', fontValue);
-    if (activeNoteIndex !== null) saveNote();
+.settings-cog-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
 }
 
-function changeFontSize(sizeValue) {
-    currentFontSize = sizeValue;
-    const fontSizeBtn = document.getElementById('font-size-btn');
-    if (fontSizeBtn) fontSizeBtn.textContent = (fontSizeNamesMap[sizeValue] || 'Size') + ' ▾';
-
-    applyInlineStyle('fontSize', sizeValue);
-    if (activeNoteIndex !== null) saveNote();
+.settings-cog-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-color);
 }
 
-function toggleFontMenu() {
-    const fontMenu = document.getElementById('font-menu');
-    const bulletMenu = document.getElementById('bullet-menu');
-    const fontSizeMenu = document.getElementById('font-size-menu');
-    if (bulletMenu) bulletMenu.classList.remove('open');
-    if (fontSizeMenu) fontSizeMenu.classList.remove('open');
-    if (fontMenu) fontMenu.classList.toggle('open');
+.settings-cog-btn svg {
+  transition: transform 0.3s ease;
 }
 
-function toggleFontSizeMenu() {
-    const fontSizeMenu = document.getElementById('font-size-menu');
-    const bulletMenu = document.getElementById('bullet-menu');
-    const fontMenu = document.getElementById('font-menu');
-    if (bulletMenu) bulletMenu.classList.remove('open');
-    if (fontMenu) fontMenu.classList.remove('open');
-    if (fontSizeMenu) fontSizeMenu.classList.toggle('open');
+.settings-cog-btn:hover svg {
+  transform: rotate(45deg);
 }
 
-function selectFont(fontValue, displayName) {
-    changeFont(fontValue);
-    const fontMenu = document.getElementById('font-menu');
-    if (fontMenu) fontMenu.classList.remove('open');
+/* ── Main content ── */
+.main-content {
+  flex: 1;
+  padding: 2.5rem 3rem;
+  overflow-y: auto;
+  transition: all 0.25s ease;
+  position: relative;
 }
 
-function selectFontSize(sizeValue, displayName) {
-    changeFontSize(sizeValue);
-    const fontSizeMenu = document.getElementById('font-size-menu');
-    if (fontSizeMenu) fontSizeMenu.classList.remove('open');
+/* ── App Launch Version Badge (Top Right Corner) ── */
+.app-version-badge {
+  position: absolute;
+  top: 2rem;
+  right: 2.5rem;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  padding: 5px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  letter-spacing: 0.05em;
+  user-select: none;
+  transition: all 0.2s ease;
 }
 
-function changeColour(colourValue) {
-    currentColour = colourValue;
-    applyInlineStyle('color', colourValue);
-
-    recentColours = recentColours.filter(c => c !== colourValue);
-    recentColours.unshift(colourValue);
-    recentColours = recentColours.slice(0, 7);
-    localStorage.setItem("recentColours", JSON.stringify(recentColours));
-
-    renderColourButtons();
-    if (activeNoteIndex !== null) saveNote();
+.app-version-badge:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background: var(--bg-hover-strong);
 }
 
-// BULLET POINTS
-function toggleBullets() {
-    document.execCommand('insertUnorderedList', false, null);
-    if (activeNoteIndex !== null) saveNote();
+#sidebar-toggle {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  margin-bottom: 20px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
 }
 
-function toggleBulletMenu() {
-    const menu = document.getElementById('bullet-menu');
-    const fontMenu = document.getElementById('font-menu');
-    const fontSizeMenu = document.getElementById('font-size-menu');
-    if (fontMenu) fontMenu.classList.remove('open');
-    if (fontSizeMenu) fontSizeMenu.classList.remove('open');
-    if (menu) menu.classList.toggle('open');
+#sidebar-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
-function setBulletStyle(style) {
-    document.execCommand('insertUnorderedList', false, null);
-    document.getElementById('bullet-menu').classList.remove('open');
-    if (activeNoteIndex !== null) saveNote();
+/* ── Header ── */
+header {
+  margin-bottom: 2.5rem;
+  max-width: var(--page-max-width);
+  margin-left: auto;
+  margin-right: auto;
+  transition: max-width 0.25s ease;
 }
 
-function renderColourButtons() {
-    const container = document.getElementById("colour-options");
-    if (!container) return;
-    container.innerHTML = "";
-
-    recentColours.forEach(colour => {
-        const button = document.createElement("button");
-        button.className = "colour-btn";
-        button.style.background = colour;
-        if (colour === currentColour) {
-            button.classList.add("active");
-        }
-        button.onclick = function() { changeColour(colour); };
-        container.appendChild(button);
-    });
+h1 {
+  font-size: 2.8rem;
+  font-weight: normal;
+  letter-spacing: -1px;
+  color: var(--text-primary);
 }
 
-function newNote() {
-    clearTimeout(saveTimeout);
-    isLoadingNote = true;
-
-    activeNoteIndex = null;
-
-    document.getElementById("note-title").value = "";
-    document.getElementById("note-body").innerHTML = "";
-
-    currentFont     = "'Georgia', serif";
-    currentFontSize = "1rem";
-    currentColour   = getDefaultColour();
-
-    const fontBtn = document.getElementById('font-btn');
-    if (fontBtn) fontBtn.textContent = 'Georgia ▾';
-
-    const fontSizeBtn = document.getElementById('font-size-btn');
-    if (fontSizeBtn) fontSizeBtn.textContent = 'Medium ▾';
-
-    renderColourButtons();
-    renderNotes();
-
-    isLoadingNote = false;
-    document.getElementById("note-title").focus();
+.subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-top: 6px;
 }
 
-function loadNote(index) {
-    clearTimeout(saveTimeout);
-    isLoadingNote = true;
-
-    const note = notes[index];
-    activeNoteIndex = index;
-
-    document.getElementById('note-title').value = note.title || "";
-    document.getElementById('note-body').innerHTML = note.body  || "";
-
-    currentFont     = note.font     || "'Georgia', serif";
-    currentFontSize = note.fontSize || "1rem";
-    currentColour   = note.colour   || getDefaultColour();
-
-    const fontBtn = document.getElementById('font-btn');
-    if (fontBtn) fontBtn.textContent = (fontNamesMap[currentFont] || 'Font') + ' ▾';
-
-    const fontSizeBtn = document.getElementById('font-size-btn');
-    if (fontSizeBtn) fontSizeBtn.textContent = (fontSizeNamesMap[currentFontSize] || 'Size') + ' ▾';
-
-    renderColourButtons();
-    renderNotes();
-
-    // Auto-close sidebar drawer on mobile devices or phone landscape when a note is opened
-    if (isMobileViewport() && !sidebarCollapsed) {
-        toggleSidebar();
-    }
-
-    isLoadingNote = false;
+/* ── Editor ── */
+.editor {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: var(--page-max-width);
+  margin-left: auto;
+  margin-right: auto;
+  transition: max-width 0.25s ease;
 }
 
-/**
- * Saves current note content to localStorage and updates sidebar list.
- * Preserves custom formatting (font, size, colour) and sub-section branch.
- */
-function saveNote() {
-    const title = document.getElementById('note-title').value.trim();
-    const bodyEl = document.getElementById('note-body');
-    const bodyHtml = bodyEl.innerHTML;
-    const bodyText = bodyEl.innerText.trim();
-
-    if (!bodyText && !bodyHtml.includes('<img')) return;
-
-    // Retain existing assigned section or use currently active section
-    const existingSection = (activeNoteIndex !== null && notes[activeNoteIndex]) 
-        ? (notes[activeNoteIndex].section || 'General') 
-        : (activeSection || 'General');
-
-    const noteToSave = {
-        title:    title,
-        body:     bodyHtml,
-        date:     new Date().toLocaleString(),
-        font:     currentFont,
-        fontSize: currentFontSize,
-        colour:   currentColour,
-        section:  existingSection
-    };
-
-    if (activeNoteIndex === null) {
-        notes.unshift(noteToSave);
-        activeNoteIndex = 0;
-    } else {
-        notes[activeNoteIndex] = noteToSave;
-    }
-
-    localStorage.setItem('my-notes', JSON.stringify(notes));
-    renderNotes();
+#note-title {
+  font-family: inherit;
+  font-size: 1.4rem;
+  font-weight: 600;
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+  outline: none;
+  color: var(--text-primary);
+  background: transparent;
+  transition: border-color 0.2s, color 0.2s;
 }
 
-function scheduleAutoSave() {
-    if (isLoadingNote) return;
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
-        const bodyEl = document.getElementById("note-body");
-        if (bodyEl && (bodyEl.innerText.trim() !== "" || bodyEl.innerHTML.includes('<img'))) {
-            saveNote();
-        }
-    }, 800);
+#note-title::placeholder {
+  color: var(--text-placeholder);
 }
 
-document.getElementById("note-title").addEventListener("input", scheduleAutoSave);
-document.getElementById("note-body").addEventListener("input", scheduleAutoSave);
-
-document.getElementById('note-body').addEventListener('keydown', function(e) {
-    if (e.ctrlKey && e.key === 'Enter') saveNote();
-
-    if (e.key === 'Tab') {
-        e.preventDefault();
-
-        const selection = window.getSelection();
-        if (!selection || !selection.rangeCount) return;
-
-        if (e.shiftKey) {
-            document.execCommand('outdent', false, null);
-        } else {
-            const range = selection.getRangeAt(0);
-            let node = range.commonAncestorContainer;
-            if (node.nodeType === 3) node = node.parentNode;
-
-            if (node && (node.closest('li') || node.closest('ul') || node.closest('ol'))) {
-                document.execCommand('indent', false, null);
-            } else {
-                const tabNode = document.createTextNode('\u00a0\u00a0\u00a0\u00a0');
-                range.insertNode(tabNode);
-                range.setStartAfter(tabNode);
-                range.setEndAfter(tabNode);
-                selection.removeAllRanges();
-                selection.addRange(range);
-            }
-        }
-        scheduleAutoSave();
-    }
-});
-
-function stripHtml(html) {
-    if (!html) return '';
-    const tmp = document.createElement("DIV");
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || "";
+#note-body {
+  font-family: inherit;
+  font-size: 1rem;
+  border: none;
+  min-height: 200px;
+  outline: none;
+  line-height: var(--line-height);
+  color: var(--text-primary);
+  background: transparent;
+  transition: color 0.2s;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
-function exportNotes() {
-    const now = new Date().toLocaleString();
-    let text = '========================================\n';
-    text += ' My Notes Export — ' + now + '\n';
-    text += '========================================\n\n';
-    notes.forEach(note => {
-        text += note.title ? '[ ' + note.title + ' ]\n' : '[ Untitled ]\n';
-        text += stripHtml(note.body) + '\n';
-        text += '— ' + note.date + '\n\n';
-        text += '----------------------------------------\n\n';
-    });
-    if (notes.length === 0) text += 'No notes yet.\n';
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = 'my-notes.txt';
-    a.click();
-    URL.revokeObjectURL(url);
+#note-body:empty:before {
+  content: attr(placeholder);
+  color: var(--text-placeholder);
+  pointer-events: none;
+  display: block;
 }
 
-function exportSingleNote(index) {
-    const note = notes[index];
-    const text = `${note.title ? note.title + '\n\n' : ''}${stripHtml(note.body)}\n\n${note.date}`;
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    const safeTitle = (note.title || 'untitled-note').replace(/[\\/:*?"<>|]/g, '').trim();
-    a.download = `${safeTitle}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+#note-body ul, #note-body ol {
+  padding-left: 24px;
+  margin: 6px 0;
 }
 
-function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+.editor-action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
 }
 
-/**
- * Prompts the user to create a new sub-section branch in the sidebar.
- * Adds the new section name to localStorage and refreshes the sidebar view.
- */
-function promptCreateSection() {
-    const name = window.prompt('Enter new section name:');
-    if (!name) return;
-    const trimmed = name.trim();
-    if (!trimmed) return;
-
-    if (!sections.includes(trimmed)) {
-        sections.push(trimmed);
-        localStorage.setItem('my-sections', JSON.stringify(sections));
-        renderNotes();
-    }
+/* Editor Action Row Buttons (New Note, Import Note, Export Note) */
+#save-btn, #export-btn, #new-note-btn, #import-btn {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border: 1px solid var(--btn-border);
+  padding: 7px 16px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-/**
- * Toggles a section's collapsed/expanded visibility state.
- * @param {string} sectionName - The section name to toggle.
- */
-function toggleSectionCollapse(sectionName) {
-    collapsedSections[sectionName] = !collapsedSections[sectionName];
-    localStorage.setItem('collapsed-sections', JSON.stringify(collapsedSections));
-    renderNotes();
+#save-btn:hover, #export-btn:hover, #new-note-btn:hover, #import-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
-// Variable to track the index of currently dragged note
-let draggedNoteIndex = null;
-
-/**
- * Handles the start of a drag event on a sidebar note.
- * Stores note index in dataTransfer and applies dragging visual state.
- * @param {DragEvent} event - The HTML drag event.
- * @param {number} index - The index of the note being dragged.
- */
-function handleNoteDragStart(event, index) {
-    draggedNoteIndex = index;
-    event.dataTransfer.setData('text/plain', index.toString());
-    event.dataTransfer.effectAllowed = 'move';
-    if (event.currentTarget) {
-        event.currentTarget.classList.add('dragging');
-    }
+.export-menu {
+  min-width: 230px;
 }
 
-/**
- * Handles the end of a drag event on a sidebar note.
- * Cleans up temporary dragging and drag-over visual indicator styles.
- * @param {DragEvent} event - The HTML drag event.
- */
-function handleNoteDragEnd(event) {
-    if (event.currentTarget) {
-        event.currentTarget.classList.remove('dragging');
-    }
-    document.querySelectorAll('.sidebar-section.drag-over').forEach(sec => {
-        sec.classList.remove('drag-over');
-    });
-    draggedNoteIndex = null;
+.menu-divider {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 4px 0;
 }
 
-/**
- * Handles dragover on a section dropzone to allow dropping.
- * Prevents default browser handling and highlights the target section.
- * @param {DragEvent} event - The HTML drag event.
- * @param {string} sectionName - The name of the target section.
- */
-function handleSectionDragOver(event, sectionName) {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    const sectionEl = document.getElementById(`section-${sectionName}`);
-    if (sectionEl) {
-        sectionEl.classList.add('drag-over');
-    }
+#new-note-btn:hover, #save-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
 }
 
-/**
- * Handles dragleave from a section dropzone.
- * Removes visual highlight when cursor leaves the section boundaries.
- * @param {DragEvent} event - The HTML drag event.
- * @param {string} sectionName - The name of the target section.
- */
-function handleSectionDragLeave(event, sectionName) {
-    const sectionEl = document.getElementById(`section-${sectionName}`);
-    if (sectionEl && !sectionEl.contains(event.relatedTarget)) {
-        sectionEl.classList.remove('drag-over');
-    }
+#export-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
 }
 
-/**
- * Handles dropping a dragged note onto a target section.
- * Reassigns the note's section, uncollapses the target section, and persists changes.
- * @param {DragEvent} event - The HTML drag event.
- * @param {string} sectionName - The name of the destination section.
- */
-function handleSectionDrop(event, sectionName) {
-    event.preventDefault();
-    const sectionEl = document.getElementById(`section-${sectionName}`);
-    if (sectionEl) {
-        sectionEl.classList.remove('drag-over');
-    }
-
-    const indexStr = event.dataTransfer.getData('text/plain');
-    const noteIndex = indexStr !== '' ? parseInt(indexStr, 10) : draggedNoteIndex;
-
-    if (noteIndex !== null && !isNaN(noteIndex) && noteIndex >= 0 && noteIndex < notes.length) {
-        // Update note's section assignment
-        notes[noteIndex].section = sectionName;
-        // Auto-expand destination section so the user sees their moved note
-        collapsedSections[sectionName] = false;
-
-        localStorage.setItem('my-notes', JSON.stringify(notes));
-        localStorage.setItem('collapsed-sections', JSON.stringify(collapsedSections));
-        renderNotes();
-    }
+/* ── Divider between editor and saved notes ── */
+.editor::after {
+  content: '';
+  display: block;
+  height: 1px;
+  background: var(--border-subtle);
+  margin-top: 1rem;
 }
 
-/**
- * Prompts user to rename an existing section.
- * Updates all notes currently filed under this section.
- * @param {string} oldName - The existing section name.
- */
-function promptRenameSection(oldName) {
-    if (oldName === 'General') return;
-    const newName = window.prompt(`Rename section "${oldName}" to:`, oldName);
-    if (!newName) return;
-    const trimmed = newName.trim();
-    if (!trimmed || trimmed === oldName) return;
-
-    // Update section in sections list
-    const secIndex = sections.indexOf(oldName);
-    if (secIndex !== -1) {
-        sections[secIndex] = trimmed;
-    }
-
-    // Update notes section property
-    notes.forEach(n => {
-        if ((n.section || 'General') === oldName) {
-            n.section = trimmed;
-        }
-    });
-
-    // Update collapsed state key
-    if (collapsedSections[oldName] !== undefined) {
-        collapsedSections[trimmed] = collapsedSections[oldName];
-        delete collapsedSections[oldName];
-    }
-
-    localStorage.setItem('my-sections', JSON.stringify(sections));
-    localStorage.setItem('my-notes', JSON.stringify(notes));
-    localStorage.setItem('collapsed-sections', JSON.stringify(collapsedSections));
-    renderNotes();
+/* ── Editor Toolbar & Colour Picker ── */
+.editor-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-/**
- * Confirms deletion of a section. Notes inside are moved to the General section.
- * @param {string} sectionName - The section name to delete.
- */
-function confirmDeleteSection(sectionName) {
-    if (sectionName === 'General') return;
-    const confirmed = window.confirm(`Delete section "${sectionName}"? Notes inside will be moved to General.`);
-    if (!confirmed) return;
-
-    sections = sections.filter(s => s !== sectionName);
-    notes.forEach(n => {
-        if (n.section === sectionName) {
-            n.section = 'General';
-        }
-    });
-
-    delete collapsedSections[sectionName];
-
-    localStorage.setItem('my-sections', JSON.stringify(sections));
-    localStorage.setItem('my-notes', JSON.stringify(notes));
-    localStorage.setItem('collapsed-sections', JSON.stringify(collapsedSections));
-    renderNotes();
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-/**
- * Creates a new blank note filed under a specific section.
- * @param {string} sectionName - The section name for the new note.
- */
-function promptCreateNoteInSection(sectionName) {
-    activeSection = sectionName;
-    newNote();
+#font-btn, #font-size-btn {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border: 1px solid var(--btn-border);
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
-/**
- * Renders notes organized into collapsible sub-sections in the sidebar.
- * Notes are grouped by their `section` property. Includes section controls
- * (collapse/expand, rename, delete) and note options (delete, export, drag & drop).
- */
-function renderNotes() {
-    const list = document.getElementById('notes-list');
-    if (!list) return;
-
-    // Ensure 'General' is always in the sections list
-    if (!sections.includes('General')) {
-        sections.unshift('General');
-    }
-
-    // Collect any extra sections present on notes that might not be in sections list
-    notes.forEach(n => {
-        const sec = n.section || 'General';
-        if (!sections.includes(sec)) {
-            sections.push(sec);
-        }
-    });
-
-    // Save consolidated sections list
-    localStorage.setItem('my-sections', JSON.stringify(sections));
-
-    // Group notes by section
-    const grouped = {};
-    sections.forEach(s => grouped[s] = []);
-    notes.forEach((note, index) => {
-        const sec = note.section || 'General';
-        if (!grouped[sec]) grouped[sec] = [];
-        grouped[sec].push({ note, index });
-    });
-
-    list.innerHTML = sections.map(sectionName => {
-        const sectionNotes = grouped[sectionName] || [];
-        const isCollapsed = Boolean(collapsedSections[sectionName]);
-        const safeSectionName = escapeHtml(sectionName);
-
-        return `
-            <div class="sidebar-section ${isCollapsed ? 'collapsed' : ''}" 
-                 id="section-${safeSectionName}"
-                 ondragover="handleSectionDragOver(event, '${safeSectionName}')"
-                 ondragleave="handleSectionDragLeave(event, '${safeSectionName}')"
-                 ondrop="handleSectionDrop(event, '${safeSectionName}')">
-                <div class="section-header" onclick="toggleSectionCollapse('${safeSectionName}')">
-                    <div class="section-title-group">
-                        <span class="section-toggle-icon">▾</span>
-                        <span class="section-title">${safeSectionName}</span>
-                        <span class="section-count">${sectionNotes.length}</span>
-                    </div>
-                    <div class="section-actions" onclick="event.stopPropagation()">
-                        <button class="section-icon-btn" onclick="promptCreateNoteInSection('${safeSectionName}')" title="Add note to ${safeSectionName}">+</button>
-                        ${sectionName !== 'General' ? `
-                            <button class="section-icon-btn" onclick="promptRenameSection('${safeSectionName}')" title="Rename section">✎</button>
-                            <button class="section-icon-btn" onclick="confirmDeleteSection('${safeSectionName}')" title="Delete section">×</button>
-                        ` : ''}
-                    </div>
-                </div>
-                <div class="section-notes-container">
-                    ${sectionNotes.length === 0 ? `
-                        <p class="empty-state" style="padding: 4px 8px; font-size: 0.78rem;">Empty section (drop notes here)</p>
-                    ` : sectionNotes.map(({ note, index }) => {
-                        const isActive = index === activeNoteIndex;
-                        return `
-                            <div class="sidebar-note ${isActive ? 'active' : ''}" 
-                                 draggable="true"
-                                 ondragstart="handleNoteDragStart(event, ${index})"
-                                 ondragend="handleNoteDragEnd(event)"
-                                 onclick="loadNote(${index})">
-                                <span class="sidebar-note-title">${escapeHtml(note.title || 'Untitled')}</span>
-                                <div class="menu-wrapper">
-                                    <button class="menu-btn" onclick="event.stopPropagation(); toggleMenu(${index})" title="Options">⋮</button>
-                                    <div class="dropdown-menu" id="menu-${index}">
-                                        <button onclick="event.stopPropagation(); deleteNote(${index})">Delete Note</button>
-                                        <button onclick="event.stopPropagation(); exportSingleNote(${index})">Export Note</button>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-        `;
-    }).join('');
+#font-btn:hover, #font-size-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
-function deleteNote(index) {
-    notes.splice(index, 1);
-    localStorage.setItem('my-notes', JSON.stringify(notes));
-
-    if (activeNoteIndex === index) {
-        activeNoteIndex = null;
-        document.getElementById('note-title').value = '';
-        document.getElementById('note-body').value  = '';
-    } else if (activeNoteIndex > index) {
-        activeNoteIndex--;
-    }
-
-    renderNotes();
+.font-menu, .font-size-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: var(--bg-dropdown);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  z-index: 100;
+  box-shadow: var(--shadow-dropdown);
+  min-width: 170px;
 }
 
-function toggleMenu(index) {
-    const menu = document.getElementById(`menu-${index}`);
-    document.querySelectorAll('.dropdown-menu').forEach(m => {
-        if (m !== menu) m.style.display = 'none';
-    });
-    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+.font-menu.open, .font-size-menu.open {
+  display: block;
 }
 
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('.menu-wrapper')) {
-        document.querySelectorAll('.dropdown-menu').forEach(menu => {
-            menu.style.display = 'none';
-        });
-    }
-    if (!e.target.closest('.bullet-wrapper')) {
-        const bulletMenu = document.getElementById('bullet-menu');
-        const fontMenu = document.getElementById('font-menu');
-        const fontSizeMenu = document.getElementById('font-size-menu');
-        if (bulletMenu) bulletMenu.classList.remove('open');
-        if (fontMenu) fontMenu.classList.remove('open');
-        if (fontSizeMenu) fontSizeMenu.classList.remove('open');
-    }
-});
-
-// ─────────────────────────────────────────
-// IMPORT NOTE FEATURE
-// ─────────────────────────────────────────
-
-/**
- * Triggers the file selection dialog by clicking the hidden file input element.
- * Called when the user clicks the "📥 Import Note" button in the editor action bar.
- */
-function triggerImportFile() {
-    const fileInput = document.getElementById('import-file-input');
-    if (fileInput) {
-        fileInput.click();
-    }
+.font-menu button, .font-size-menu button {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  text-align: left;
+  padding: 9px 14px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s;
 }
 
-/**
- * Handles file selection and imports the text file as a new note in the notebook.
- * Supports .txt, .md, .html, and .json files. Automatically sets the note title
- * from the file name, converts line breaks to HTML formatting, saves the note into
- * localStorage, and opens it directly in the editor.
- * 
- * @param {Event} event - The file input change event object containing selected files.
- */
-function handleFileImport(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    // Extract file name without extension to use as default note title
-    const fileName = file.name.replace(/\.[^/.]+$/, "");
-
-    const reader = new FileReader();
-
-    // Event handler executed once file reading completes
-    reader.onload = function(e) {
-        const fileContent = e.target.result || "";
-        let formattedBody = "";
-
-        // Format HTML files vs Plain Text / Markdown files
-        if (file.type.includes("html") || file.name.endsWith(".html")) {
-            formattedBody = fileContent;
-        } else {
-            // Convert plain text newlines into HTML breaks for contenteditable container
-            formattedBody = escapeHtml(fileContent).replace(/\r\n|\r|\n/g, '<br>');
-        }
-
-        // Create new imported note object with default font, color, and section settings
-        const importedNote = {
-            title: fileName,
-            body: formattedBody,
-            date: new Date().toLocaleString(),
-            font: "'Georgia', serif",
-            fontSize: "1rem",
-            colour: getDefaultColour(),
-            section: activeSection || 'General'
-        };
-
-        // Add imported note to the top of the notes list array
-        notes.unshift(importedNote);
-        activeNoteIndex = 0;
-
-        // Persist updated notebook list to LocalStorage
-        localStorage.setItem('my-notes', JSON.stringify(notes));
-
-        // Load newly imported note into editor UI & refresh sidebar recents list
-        loadNote(0);
-        renderNotes();
-
-        // Reset file input value so the user can import the same file again if desired
-        event.target.value = "";
-    };
-
-    // Read file contents as UTF-8 plain text
-    reader.readAsText(file);
+.font-menu button:hover, .font-size-menu button:hover {
+  background: var(--bg-hover);
+  color: var(--accent-blue);
 }
 
-function toggleExportMenu() {
-    const exportMenu = document.getElementById('export-menu');
-    const bulletMenu = document.getElementById('bullet-menu');
-    const fontMenu = document.getElementById('font-menu');
-    const fontSizeMenu = document.getElementById('font-size-menu');
-    if (bulletMenu) bulletMenu.classList.remove('open');
-    if (fontMenu) fontMenu.classList.remove('open');
-    if (fontSizeMenu) fontSizeMenu.classList.remove('open');
-    if (exportMenu) exportMenu.classList.toggle('open');
+.editor-colour-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-function cleanHtmlToText(html) {
-    if (!html) return '';
-    const temp = document.createElement('div');
-    temp.innerHTML = html;
-    
-    temp.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
-    temp.querySelectorAll('p, div, li, tr').forEach(block => {
-        block.prepend(document.createTextNode('\n'));
-    });
-    
-    let text = temp.textContent || temp.innerText || '';
-    return text.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+.colour-options {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-function exportSingleNoteHTML(index) {
-    const exportMenu = document.getElementById('export-menu');
-    if (exportMenu) exportMenu.classList.remove('open');
-
-    let note = (index !== null && notes[index]) ? notes[index] : null;
-    if (!note) {
-        const currentTitle = document.getElementById('note-title').value.trim();
-        const currentBody = document.getElementById('note-body').innerHTML;
-        if (!currentBody) return;
-        note = { title: currentTitle, body: currentBody, date: new Date().toLocaleString() };
-    }
-
-    const titleText = note.title ? escapeHtml(note.title) : 'Untitled Note';
-    let htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${titleText}</title>
-  <style>
-    body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #37352f; padding: 40px; max-width: 720px; margin: auto; background: #ffffff; }
-    h1 { font-family: 'Georgia', serif; font-size: 2rem; color: #111111; margin-bottom: 8px; border-bottom: 2px solid #e9e9e8; padding-bottom: 12px; }
-    .note-date { font-size: 0.85rem; color: #787774; margin-bottom: 24px; }
-    .note-content { font-size: 1rem; word-wrap: break-word; }
-  </style>
-</head>
-<body>
-  <h1>${titleText}</h1>
-  <div class="note-date">Created: ${escapeHtml(note.date)}</div>
-  <div class="note-content">${note.body}</div>
-</body>
-</html>`;
-
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const safeTitle = (note.title || 'untitled-note').replace(/[\\/:*?"<>|]/g, '').trim();
-    a.download = `${safeTitle}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+.colour-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s, border-color 0.15s;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15);
 }
 
-function exportSingleNoteTXT(index) {
-    const exportMenu = document.getElementById('export-menu');
-    if (exportMenu) exportMenu.classList.remove('open');
-
-    let note = (index !== null && notes[index]) ? notes[index] : null;
-    if (!note) {
-        const currentTitle = document.getElementById('note-title').value.trim();
-        const currentBody = document.getElementById('note-body').innerHTML;
-        if (!currentBody) return;
-        note = { title: currentTitle, body: currentBody, date: new Date().toLocaleString() };
-    }
-
-    const plainBody = cleanHtmlToText(note.body);
-    const text = `${note.title ? note.title + '\r\n\r\n' : ''}${plainBody}\r\n\r\n— ${note.date}`;
-    
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const safeTitle = (note.title || 'untitled-note').replace(/[\\/:*?"<>|]/g, '').trim();
-    a.download = `${safeTitle}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+.colour-btn:hover {
+  transform: scale(1.2);
 }
 
-function exportAllNotesHTML() {
-    const exportMenu = document.getElementById('export-menu');
-    if (exportMenu) exportMenu.classList.remove('open');
-
-    const now = new Date().toLocaleString();
-    let htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>All Notes Export</title>
-  <style>
-    body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #37352f; padding: 40px; max-width: 800px; margin: auto; background: #f7f6f3; }
-    h1 { font-family: 'Georgia', serif; text-align: center; color: #111111; margin-bottom: 30px; }
-    .note-card { background: #ffffff; border: 1px solid #e9e9e8; border-radius: 10px; padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
-    .note-title { font-size: 1.4rem; font-weight: 600; color: #222222; margin: 0 0 8px 0; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px; }
-    .note-date { font-size: 0.8rem; color: #888888; margin-bottom: 16px; }
-    .note-body { font-size: 1rem; word-wrap: break-word; }
-  </style>
-</head>
-<body>
-  <h1>My Notebook Export — ${now}</h1>`;
-
-    notes.forEach(note => {
-        const title = escapeHtml(note.title || 'Untitled Note');
-        htmlContent += `
-  <div class="note-card">
-    <div class="note-title">${title}</div>
-    <div class="note-date">${escapeHtml(note.date)}</div>
-    <div class="note-body">${note.body}</div>
-  </div>`;
-    });
-
-    htmlContent += `\n</body>\n</html>`;
-
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `all-notes-${new Date().toISOString().slice(0,10)}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+.colour-btn.active {
+  border-color: var(--color-active-ring);
+  transform: scale(1.15);
+  box-shadow: 0 0 0 2px var(--bg-body), 0 0 0 3px var(--color-active-ring);
 }
 
-function exportAllNotesTXT() {
-    const exportMenu = document.getElementById('export-menu');
-    if (exportMenu) exportMenu.classList.remove('open');
-
-    const now = new Date().toLocaleString();
-    let text = '========================================\r\n';
-    text += ' My Notes Export — ' + now + '\r\n';
-    text += '========================================\r\n\r\n';
-    notes.forEach(note => {
-        text += note.title ? '[ ' + note.title + ' ]\r\n' : '[ Untitled ]\r\n';
-        text += cleanHtmlToText(note.body) + '\r\n';
-        text += '— ' + note.date + '\r\n\r\n';
-        text += '----------------------------------------\r\n\r\n';
-    });
-    if (notes.length === 0) text += 'No notes yet.\r\n';
-    
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'my-notes.txt';
-    a.click();
-    URL.revokeObjectURL(url);
+#more-colours-btn {
+  background: var(--btn-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin: 0;
 }
 
-// ─────────────────────────────────────────
-// CUSTOM CENTERED COLOR PICKER MODAL
-// ─────────────────────────────────────────
-
-let pendingModalColor = '#37352f';
-let savedSelectionRange = null;
-
-function openColorPickerModal() {
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-        savedSelectionRange = selection.getRangeAt(0).cloneRange();
-    } else {
-        savedSelectionRange = null;
-    }
-
-    pendingModalColor = currentColour || getDefaultColour();
-    updateModalColorUI(pendingModalColor);
-
-    const modal = document.getElementById('color-picker-modal');
-    if (modal) modal.showModal();
+#more-colours-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
-function closeColorPickerModal() {
-    const modal = document.getElementById('color-picker-modal');
-    if (modal) modal.close();
+/* ── Claude-style Sidebar Notes & Sub-sections ── */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px;
+  margin-bottom: 0.5rem;
 }
 
-function selectModalColor(colorHex) {
-    pendingModalColor = colorHex;
-    updateModalColorUI(colorHex);
+.sidebar-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
 }
 
-function onHexTextInput(val) {
-    if (/^#[0-9A-F]{6}$/i.test(val) || /^#[0-9A-F]{3}$/i.test(val)) {
-        pendingModalColor = val;
-        updateModalColorUI(val, false);
-    }
+.add-section-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-function updateModalColorUI(colorHex, updateHexText = true) {
-    const previewDot = document.getElementById('modal-color-preview');
-    if (previewDot) previewDot.style.background = colorHex;
-
-    const nativePicker = document.getElementById('modal-hex-picker');
-    if (nativePicker && /^#[0-9A-F]{6}$/i.test(colorHex)) {
-        nativePicker.value = colorHex;
-    }
-
-    if (updateHexText) {
-        const hexText = document.getElementById('modal-hex-text');
-        if (hexText) hexText.value = colorHex;
-    }
+.add-section-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
-function applyModalColor() {
-    if (savedSelectionRange) {
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(savedSelectionRange);
-    }
-
-    changeColour(pendingModalColor);
-    closeColorPickerModal();
+/* ── Sidebar Sub-sections (Branches / Folders) ── */
+.sidebar-section {
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  border: 1.5px dashed transparent;
+  border-radius: 8px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  padding: 2px;
 }
 
-/**
- * Determines whether the current device/viewport is in a mobile or landscape-constrained view.
- * Checks viewport width, height (for phone landscape), and touch/pointer characteristics.
- * @returns {boolean} True if in mobile or phone landscape mode.
- */
-function isMobileViewport() {
-    const isNarrow = window.innerWidth <= 768;
-    const isShortLandscape = window.innerHeight <= 550 && window.innerWidth <= 1024;
-    const isTouchLandscape = window.matchMedia('(orientation: landscape)').matches && 
-                             window.matchMedia('(hover: none) and (pointer: coarse)').matches && 
-                             window.innerWidth <= 1024;
-    return isNarrow || isShortLandscape || isTouchLandscape;
+/* Active drop target highlight when dragging notes */
+.sidebar-section.drag-over {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-bg);
 }
 
-// Check saved preference or default to collapsed on mobile screens / phone landscape
-let savedSidebarState = localStorage.getItem("sidebarCollapsed");
-let sidebarCollapsed = savedSidebarState !== null ? savedSidebarState === "true" : isMobileViewport();
-
-/**
- * Toggles the sidebar visibility between open and collapsed states.
- * Updates DOM classes, toggle button indicator arrow, and persists preference.
- */
-function toggleSidebar() {
-    sidebarCollapsed = !sidebarCollapsed;
-
-    const sidebar = document.querySelector(".sidebar");
-    const button = document.getElementById("sidebar-toggle");
-
-    if (sidebar) sidebar.classList.toggle("collapsed", sidebarCollapsed);
-    if (button) button.textContent = sidebarCollapsed ? "❯" : "❮";
-
-    localStorage.setItem("sidebarCollapsed", sidebarCollapsed);
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+  color: var(--text-secondary);
 }
 
-// ─────────────────────────────────────────
-// INIT
-// ─────────────────────────────────────────
-setTheme(currentTheme);
-setAccentColor(currentAccent);
-changeLineHeight(currentLineHeight);
-changePageWidth(currentPageWidth);
-toggleSpellcheck(currentSpellcheck);
-
-renderNotes();
-renderColourButtons();
-const button = document.getElementById("sidebar-toggle");
-
-if (sidebarCollapsed) {
-    document.querySelector(".sidebar").classList.add("collapsed");
-    if (button) button.textContent = "❯";
-} else {
-    if (button) button.textContent = "❮";
+.section-header:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
-// Settings Modal Backdrop Click
-const modal = document.getElementById('settings-modal');
-if (modal) {
-    modal.addEventListener('click', function(e) {
-        if (e.target === this) closeSettingsModal();
-    });
+.section-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
 }
 
-// Color Picker Modal Backdrop Click
-const colorPickerModal = document.getElementById('color-picker-modal');
-if (colorPickerModal) {
-    colorPickerModal.addEventListener('click', function(e) {
-        if (e.target === this) closeColorPickerModal();
-    });
+.section-toggle-icon {
+  font-size: 0.7rem;
+  transition: transform 0.2s ease;
+  width: 14px;
+  display: inline-block;
+  text-align: center;
 }
 
-// Keyboard shortcut (Ctrl + , or Cmd + ,) to open settings
-document.addEventListener('keydown', function(e) {
-    if ((e.ctrlKey || e.metaKey) && e.key === ',') {
-        e.preventDefault();
-        openSettingsModal();
-    }
-});
+.sidebar-section.collapsed .section-toggle-icon {
+  transform: rotate(-90deg);
+}
+
+.section-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section-count {
+  font-size: 0.72rem;
+  color: var(--text-placeholder);
+  background: var(--bg-hover-strong);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.section-header:hover .section-actions {
+  opacity: 1;
+}
+
+.section-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.section-icon-btn:hover {
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
+}
+
+.section-notes-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 6px;
+  margin-top: 2px;
+}
+
+.sidebar-section.collapsed .section-notes-container {
+  display: none;
+}
+
+.notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.empty-state {
+  text-align: left;
+  color: var(--text-placeholder);
+  font-size: 0.85rem;
+  padding: 0.75rem 8px;
+}
+
+.sidebar-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+  min-height: 36px;
+  gap: 8px;
+  color: var(--text-secondary);
+  background: transparent;
+  user-select: none;
+}
+
+.sidebar-note[draggable="true"] {
+  cursor: grab;
+}
+
+.sidebar-note.dragging {
+  opacity: 0.35;
+  cursor: grabbing !important;
+  background: var(--bg-hover-strong);
+}
+
+.sidebar-note:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.sidebar-note.active {
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.sidebar-note-title {
+  font-size: 0.875rem;
+  font-weight: inherit;
+  color: inherit;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sidebar-note .menu-wrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.sidebar-note .menu-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+}
+
+.sidebar-note:hover .menu-btn,
+.sidebar-note.active .menu-btn {
+  opacity: 1;
+}
+
+.sidebar-note .menu-btn:hover {
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 28px;
+  right: 0;
+  min-width: 150px;
+  background: var(--bg-dropdown);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: var(--shadow-dropdown);
+  overflow: hidden;
+  z-index: 50;
+}
+
+.dropdown-menu button {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  text-align: left;
+  padding: 9px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.dropdown-menu button:hover {
+  background: var(--bg-hover);
+}
+
+.dropdown-menu button:first-child:hover {
+  color: #e03e3e;
+}
+
+.dropdown-menu button:nth-child(2):hover {
+  color: var(--accent-blue);
+}
+
+/* ── Bullet toggle button ── */
+.bullet-wrapper {
+  align-self: flex-start;
+  display: flex;
+  position: relative;
+}
+
+#bullet-btn {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border: 1px solid var(--btn-border);
+  border-right: none;
+  padding: 5px 12px;
+  border-radius: 6px 0 0 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#bullet-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+#bullet-btn.active {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  background: var(--accent-blue-bg);
+}
+
+#bullet-style-btn {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border: 1px solid var(--btn-border);
+  padding: 5px 8px;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#bullet-style-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.bullet-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: var(--bg-dropdown);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  z-index: 100;
+  box-shadow: var(--shadow-dropdown);
+  min-width: 160px;
+}
+
+.bullet-menu.open {
+  display: block;
+}
+
+.bullet-menu button {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.bullet-menu button:hover {
+  background: var(--bg-hover);
+  color: var(--accent-blue);
+}
+
+/* ── Settings Modal Dialog Styling ── */
+.settings-dialog {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0;
+  background: var(--bg-dropdown);
+  color: var(--text-primary);
+  box-shadow: 0 20px 48px rgba(0,0,0,0.3);
+  max-width: 700px;
+  width: 90vw;
+  max-height: 80vh;
+  margin: auto;
+  overflow: hidden;
+}
+
+.settings-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.settings-container {
+  display: flex;
+  flex-direction: column;
+  height: 520px;
+  max-height: 80vh;
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-sidebar);
+}
+
+.settings-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.modal-close-btn:hover {
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
+}
+
+.settings-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.settings-tabs {
+  width: 200px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-color);
+  padding: 1rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tab-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tab-btn.active {
+  background: var(--bg-body);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.settings-content {
+  flex: 1;
+  padding: 1.5rem 2rem;
+  overflow-y: auto;
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+.setting-group-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  margin-top: 0.25rem;
+  font-weight: 600;
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  gap: 16px;
+}
+
+.setting-info label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  display: block;
+}
+
+.setting-info p {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.settings-select {
+  background: var(--bg-dropdown);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  outline: none;
+}
+
+.settings-select:hover {
+  border-color: var(--border-strong);
+}
+
+.theme-card-group {
+  display: flex;
+  gap: 8px;
+}
+
+.theme-card-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  transition: all 0.15s ease;
+}
+
+.theme-card-btn:hover {
+  border-color: var(--border-strong);
+}
+
+.theme-card-btn.active {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px var(--accent-blue-bg);
+}
+
+.theme-preview {
+  width: 32px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.15);
+}
+
+.light-preview { background: #ffffff; }
+.dark-preview { background: #191919; }
+.sepia-preview { background: #f4ebd9; }
+
+.accent-picker {
+  display: flex;
+  gap: 8px;
+}
+
+.accent-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.accent-btn:hover {
+  transform: scale(1.15);
+}
+
+.accent-btn.active {
+  border-color: var(--text-primary);
+  transform: scale(1.15);
+  box-shadow: 0 0 0 2px var(--bg-dropdown), 0 0 0 3px var(--text-primary);
+}
+
+/* Toggle switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 22px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: var(--border-strong);
+  transition: .2s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .2s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--accent-blue);
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+.settings-action-btn {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border: 1px solid var(--btn-border);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.settings-action-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.settings-danger-btn {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.settings-danger-btn:hover {
+  background: #fca5a5;
+  color: #991b1b;
+}
+
+.danger-text {
+  color: #dc2626;
+}
+
+/* ── Centered Custom Color Picker Modal ── */
+.color-picker-dialog {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0;
+  background: var(--bg-dropdown);
+  color: var(--text-primary);
+  box-shadow: 0 20px 48px rgba(0,0,0,0.35);
+  max-width: 400px;
+  width: 90vw;
+  margin: auto;
+  overflow: hidden;
+}
+
+.color-picker-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.color-picker-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.color-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-sidebar);
+}
+
+.color-picker-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.color-picker-title h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.color-preview-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  display: inline-block;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15);
+}
+
+.color-picker-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.color-section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.preset-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.swatch-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15);
+}
+
+.swatch-btn:hover {
+  transform: scale(1.18);
+  border-color: var(--text-primary);
+}
+
+.custom-color-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-sidebar);
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.modal-color-input {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0;
+}
+
+.hex-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.hex-input-wrapper span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.hex-text-input {
+  width: 100%;
+  background: var(--bg-dropdown);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  font-family: monospace;
+  outline: none;
+}
+
+.color-picker-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-sidebar);
+}
+
+.primary-btn {
+  background: var(--accent-blue) !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 600 !important;
+}
+
+.primary-btn:hover {
+  opacity: 0.9;
+}
+
+/* ──────────────────────────────────────────────────────────
+   MOBILE & TABLET RESPONSIVE STYLES
+   Optimizes layout, sidebar drawer, touch targets, and typography for mobile screens
+   ────────────────────────────────────────────────────────── */
+
+/* Mobile Sidebar Backdrop */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+@media (max-width: 768px), (max-height: 550px) and (orientation: landscape), (max-width: 1024px) and (orientation: landscape) and (hover: none) and (pointer: coarse) {
+  /* App layout container */
+  .app-layout {
+    position: relative;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  /* Mobile Slide-in Drawer Sidebar */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 1000;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
+    transform: translateX(0);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Hidden sidebar on mobile translates off-screen */
+  .sidebar.collapsed {
+    transform: translateX(-100%);
+    width: 280px;
+    padding: 1.25rem 1rem;
+    box-shadow: none;
+  }
+
+  /* Show backdrop when mobile sidebar is open */
+  .sidebar:not(.collapsed) ~ .sidebar-backdrop {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Main editor content on mobile */
+  .main-content {
+    padding: 1rem 1.1rem;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Sidebar toggle button on mobile */
+  #sidebar-toggle {
+    margin-bottom: 0.75rem;
+    padding: 6px 12px;
+    font-size: 1.25rem;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Header and title proportions on mobile */
+  header {
+    margin-bottom: 1.25rem;
+  }
+
+  h1 {
+    font-size: 1.85rem;
+    letter-spacing: -0.5px;
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+  }
+
+  /* Version badge in top right on mobile */
+  .app-version-badge {
+    top: 1rem;
+    right: 1rem;
+    font-size: 0.8rem;
+    padding: 3px 10px;
+  }
+
+  /* Editor container */
+  .editor {
+    margin-bottom: 2rem;
+    gap: 10px;
+  }
+
+  #note-title {
+    font-size: 1.15rem;
+    padding-bottom: 6px;
+  }
+
+  /* Editor toolbar and dropdowns on mobile */
+  .editor-tools {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .toolbar-left {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .bullet-wrapper {
+    position: relative;
+  }
+
+  #bullet-btn, #bullet-style-btn, #font-btn, #font-size-btn {
+    font-size: 0.82rem;
+    padding: 6px 10px;
+    min-height: 36px;
+  }
+
+  /* Color picker toolbar on mobile */
+  .editor-colour-picker {
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .colour-options {
+    flex-shrink: 0;
+  }
+
+  .colour-btn {
+    width: 24px;
+    height: 24px;
+  }
+
+  #more-colours-btn {
+    min-width: 32px;
+    min-height: 32px;
+  }
+
+  /* Note text body on mobile */
+  #note-body {
+    min-height: 250px;
+    font-size: 0.98rem;
+    line-height: 1.6;
+  }
+
+  /* Action buttons row on mobile */
+  .editor-action-row {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 1rem;
+  }
+
+  #save-btn, #export-btn, #new-note-btn, #import-btn {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 130px;
+    text-align: center;
+    padding: 10px 12px;
+    font-size: 0.85rem;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .export-wrapper {
+    flex: 1 1 calc(50% - 4px);
+  }
+
+  #export-btn {
+    width: 100%;
+  }
+
+  /* Settings modal on mobile */
+  .settings-dialog {
+    width: 95vw;
+    max-height: 88vh;
+    border-radius: 12px;
+  }
+
+  .settings-body {
+    flex-direction: column;
+    height: auto;
+    max-height: 65vh;
+  }
+
+  .settings-tabs {
+    flex-direction: row;
+    width: 100%;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+    padding: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab-btn {
+    white-space: nowrap;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+  .settings-content {
+    padding: 1rem;
+  }
+
+  .theme-card-group {
+    flex-direction: column;
+  }
+
+  .setting-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .settings-select {
+    width: 100%;
+  }
+
+  /* Custom Color picker dialog on mobile */
+  .color-picker-dialog {
+    width: 92vw;
+    max-width: 360px;
+  }
+
+  .preset-swatches {
+    gap: 10px;
+  }
+
+  .swatch-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  /* Make section action buttons always visible and touch-accessible on mobile */
+  .section-actions {
+    opacity: 1;
+  }
+
+  .section-icon-btn {
+    padding: 4px 6px;
+    font-size: 0.85rem;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────
+   MOBILE LANDSCAPE COMPACT STYLES
+   Compresses spacing, headers, and toolbars when phone is rotated horizontally
+   ────────────────────────────────────────────────────────── */
+@media (max-height: 550px) and (orientation: landscape) {
+  .main-content {
+    padding: 0.6rem 1rem;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  /* Compact inline header */
+  header {
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  h1 {
+    font-size: 1.3rem;
+    line-height: 1.2;
+  }
+
+  .subtitle {
+    font-size: 0.75rem;
+    margin-top: 0;
+  }
+
+  /* Compact top-right badge */
+  .app-version-badge {
+    top: 0.6rem;
+    right: max(1rem, env(safe-area-inset-right));
+    font-size: 0.72rem;
+    padding: 2px 8px;
+  }
+
+  /* Sidebar toggle button in landscape */
+  #sidebar-toggle {
+    margin-bottom: 0.4rem;
+    padding: 4px 8px;
+    font-size: 1rem;
+  }
+
+  /* Compact editor container */
+  .editor {
+    margin-bottom: 1.25rem;
+    gap: 8px;
+  }
+
+  #note-title {
+    font-size: 1.05rem;
+    padding-bottom: 4px;
+  }
+
+  /* Horizontal toolbar in landscape */
+  .editor-tools {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .toolbar-left {
+    width: auto;
+    gap: 4px;
+  }
+
+  #bullet-btn, #bullet-style-btn, #font-btn, #font-size-btn {
+    font-size: 0.78rem;
+    padding: 4px 8px;
+    min-height: 30px;
+  }
+
+  .editor-colour-picker {
+    width: auto;
+  }
+
+  .colour-btn {
+    width: 20px;
+    height: 20px;
+  }
+
+  #more-colours-btn {
+    min-width: 26px;
+    min-height: 26px;
+    font-size: 0.75rem;
+  }
+
+  /* Editor text area in landscape */
+  #note-body {
+    min-height: 160px;
+    font-size: 0.95rem;
+  }
+
+  /* Compact action buttons row */
+  .editor-action-row {
+    margin-top: 0.6rem;
+    gap: 6px;
+  }
+
+  #save-btn, #export-btn, #new-note-btn, #import-btn {
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    min-width: 100px;
+  }
+
+  /* Compact modal dialogs in landscape */
+  .settings-dialog {
+    max-height: 94vh;
+    max-height: 94dvh;
+    width: 90vw;
+  }
+
+  .settings-body {
+    max-height: 52vh;
+  }
+
+  .color-picker-dialog {
+    max-height: 92vh;
+    max-height: 92dvh;
+  }
+}
