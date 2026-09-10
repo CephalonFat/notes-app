@@ -390,6 +390,8 @@ function saveNote() {
         section:  existingSection
     };
 
+    const savedIndex = activeNoteIndex === null ? 0 : activeNoteIndex;
+
     if (activeNoteIndex === null) {
         notes.unshift(noteToSave);
         activeNoteIndex = 0;
@@ -399,6 +401,15 @@ function saveNote() {
 
     localStorage.setItem('my-notes', JSON.stringify(notes));
     renderNotes();
+
+    // Broadcast saved note to connected peer collaborators
+    if (!isApplyingRemoteUpdate && typeof activeConnections !== 'undefined' && activeConnections.length > 0) {
+        broadcastCollabMessage({
+            type: 'NOTE_SAVED',
+            index: savedIndex,
+            note: noteToSave
+        });
+    }
 }
 
 function scheduleAutoSave() {
@@ -411,9 +422,29 @@ function scheduleAutoSave() {
         }
     }, 800);
 }
+ 
+/**
+  * Handles live text input in the note editor.
+  * Triggers auto-save timer and broadcasts real-time keystroke updates to connected peers.
+  */
+function onEditorInput() {
+    scheduleAutoSave();
 
-document.getElementById("note-title").addEventListener("input", scheduleAutoSave);
-document.getElementById("note-body").addEventListener("input", scheduleAutoSave);
+    // Broadcast live typing if collaborating in an active room session
+    if (!isApplyingRemoteUpdate && typeof activeConnections !== 'undefined' && activeConnections.length > 0 && activeNoteIndex !== null) {
+        const titleEl = document.getElementById('note-title');
+        const bodyEl = document.getElementById('note-body');
+        broadcastCollabMessage({
+            type: 'NOTE_EDIT_LIVE',
+            index: activeNoteIndex,
+            title: titleEl ? titleEl.value : '',
+            body: bodyEl ? bodyEl.innerHTML : ''
+        });
+    }
+}
+
+document.getElementById("note-title").addEventListener("input", onEditorInput);
+document.getElementById("note-body").addEventListener("input", onEditorInput);
 
 document.getElementById('note-body').addEventListener('keydown', function(e) {
     if (e.ctrlKey && e.key === 'Enter') saveNote();
@@ -610,6 +641,15 @@ function handleSectionDrop(event, sectionName) {
         localStorage.setItem('my-notes', JSON.stringify(notes));
         localStorage.setItem('collapsed-sections', JSON.stringify(collapsedSections));
         renderNotes();
+
+        // Broadcast note relocation to connected peer collaborators
+        if (!isApplyingRemoteUpdate && typeof activeConnections !== 'undefined' && activeConnections.length > 0) {
+            broadcastCollabMessage({
+                type: 'NOTE_MOVED',
+                index: noteIndex,
+                section: sectionName
+            });
+        }
     }
 }
 
@@ -783,6 +823,14 @@ function deleteNote(index) {
     }
 
     renderNotes();
+
+    // Broadcast note deletion to connected peer collaborators
+    if (!isApplyingRemoteUpdate && typeof activeConnections !== 'undefined' && activeConnections.length > 0) {
+        broadcastCollabMessage({
+            type: 'NOTE_DELETED',
+            index: index
+        });
+    }
 }
 
 function toggleMenu(index) {
@@ -1186,3 +1234,414 @@ document.addEventListener('keydown', function(e) {
         openSettingsModal();
     }
 });
+
+// Collaboration Modal Backdrop Click
+const collabModal = document.getElementById('collab-modal');
+if (collabModal) {
+    collabModal.addEventListener('click', function(e) {
+        if (e.target === this) closeCollabModal();
+    });
+}
+
+// ─────────────────────────────────────────
+// REAL-TIME SHARED NOTES COLLABORATION (PEERJS)
+// ─────────────────────────────────────────
+
+// Prefix applied to room codes to prevent ID collisions on public PeerJS relay
+const PEER_ROOM_PREFIX = 'draftly-room-';
+
+// Core peer-to-peer networking state
+let peerInstance = null;
+let activeConnections = [];
+let currentRoomCode = null;
+let isHostingRoom = false;
+let isApplyingRemoteUpdate = false;
+
+/**
+ * Opens the real-time collaboration modal dialog and refreshes its UI state.
+ */
+function openCollabModal() {
+    const modal = document.getElementById('collab-modal');
+    if (modal) {
+        updateCollabModalUI();
+        modal.showModal();
+    }
+}
+
+/**
+ * Closes the real-time collaboration modal dialog.
+ */
+function closeCollabModal() {
+    const modal = document.getElementById('collab-modal');
+    if (modal) {
+        modal.close();
+    }
+}
+
+/**
+ * Generates an easily readable 6-character room code string.
+ * Omits easily confused characters like 0, O, 1, and I for clarity.
+ * @returns {string} The randomly generated uppercase room code.
+ */
+function generateRoomCode() {
+    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
+/**
+ * Updates the text, pulse indicator, and badges for collaboration status across the app.
+ * @param {string} statusText - The human-readable status description.
+ * @param {string} mode - The current state: 'offline', 'hosting', or 'connected'.
+ */
+function updateCollabStatus(statusText, mode = 'offline') {
+    const headerTextEl = document.getElementById('collab-status-text');
+    const headerBadgeEl = document.getElementById('collab-status-badge');
+    const cardEl = document.getElementById('collab-status-card');
+    const detailEl = document.getElementById('collab-status-detail');
+
+    if (headerTextEl) headerTextEl.textContent = statusText;
+    if (detailEl) detailEl.textContent = statusText;
+
+    if (headerBadgeEl) {
+        headerBadgeEl.classList.remove('connected', 'hosting');
+        if (mode === 'connected') headerBadgeEl.classList.add('connected');
+        else if (mode === 'hosting') headerBadgeEl.classList.add('hosting');
+    }
+
+    if (cardEl) {
+        cardEl.classList.remove('connected', 'hosting');
+        if (mode === 'connected') cardEl.classList.add('connected');
+        else if (mode === 'hosting') cardEl.classList.add('hosting');
+    }
+}
+
+/**
+ * Updates visible buttons, room code fields, and subtexts in the collaboration modal.
+ */
+function updateCollabModalUI() {
+    const roomRow = document.getElementById('room-display-row');
+    const roomCodeVal = document.getElementById('current-room-code');
+    const startHostBtn = document.getElementById('start-host-btn');
+    const disconnectBtn = document.getElementById('disconnect-btn');
+    const joinCard = document.getElementById('collab-join-card');
+    const subtextEl = document.getElementById('collab-status-subtext');
+
+    if (currentRoomCode) {
+        if (roomRow) roomRow.style.display = 'flex';
+        if (roomCodeVal) roomCodeVal.textContent = currentRoomCode;
+        if (startHostBtn) startHostBtn.style.display = 'none';
+        if (disconnectBtn) disconnectBtn.style.display = 'inline-block';
+        if (joinCard) joinCard.style.display = isHostingRoom ? 'none' : 'flex';
+
+        if (activeConnections.length > 0) {
+            if (subtextEl) subtextEl.textContent = 'Synchronizing notes live with connected partner.';
+        } else if (isHostingRoom) {
+            if (subtextEl) subtextEl.textContent = 'Share your room code or invite link to connect.';
+        }
+    } else {
+        if (roomRow) roomRow.style.display = 'none';
+        if (startHostBtn) startHostBtn.style.display = 'inline-block';
+        if (disconnectBtn) disconnectBtn.style.display = 'none';
+        if (joinCard) joinCard.style.display = 'flex';
+        if (subtextEl) subtextEl.textContent = 'Start a room or join with a room code to sync notes in real time.';
+    }
+}
+
+/**
+ * Initiates a new hosted collaboration room session.
+ * Generates a room code, connects to the PeerJS signaling broker, and listens for joiners.
+ */
+function startHosting() {
+    if (peerInstance) {
+        disconnectCollab();
+    }
+
+    currentRoomCode = generateRoomCode();
+    isHostingRoom = true;
+
+    updateCollabStatus('Starting shared room...', 'hosting');
+
+    try {
+        peerInstance = new Peer(PEER_ROOM_PREFIX + currentRoomCode, {
+            debug: 1
+        });
+
+        peerInstance.on('open', (id) => {
+            updateCollabStatus(`Room active: ${currentRoomCode} (waiting for partner)`, 'hosting');
+            updateCollabModalUI();
+        });
+
+        peerInstance.on('connection', (conn) => {
+            setupPeerConnection(conn);
+        });
+
+        peerInstance.on('error', (err) => {
+            console.error('Peer host error:', err);
+            updateCollabStatus('Room connection error', 'offline');
+        });
+
+        peerInstance.on('close', () => {
+            disconnectCollab();
+        });
+    } catch (e) {
+        console.error('Failed to initialize peer hosting:', e);
+        updateCollabStatus('Failed to start room', 'offline');
+    }
+}
+
+/**
+ * Connects this client to an existing hosted collaboration room using a room code.
+ * @param {string} code - The 6-character room code.
+ */
+function joinRoom(code) {
+    if (!code) return;
+    const cleanCode = code.trim().toUpperCase();
+    if (!cleanCode) return;
+
+    if (peerInstance) {
+        disconnectCollab();
+    }
+
+    currentRoomCode = cleanCode;
+    isHostingRoom = false;
+
+    updateCollabStatus(`Connecting to room ${cleanCode}...`, 'hosting');
+
+    try {
+        peerInstance = new Peer({
+            debug: 1
+        });
+
+        peerInstance.on('open', () => {
+            const conn = peerInstance.connect(PEER_ROOM_PREFIX + cleanCode, {
+                reliable: true
+            });
+            setupPeerConnection(conn);
+        });
+
+        peerInstance.on('error', (err) => {
+            console.error('Peer client connection error:', err);
+            updateCollabStatus('Could not connect to room', 'offline');
+        });
+
+        peerInstance.on('close', () => {
+            disconnectCollab();
+        });
+    } catch (e) {
+        console.error('Failed to join peer room:', e);
+        updateCollabStatus('Failed to join room', 'offline');
+    }
+}
+
+/**
+ * Reads room code from the join input element and triggers join process.
+ */
+function handleJoinFromInput() {
+    const input = document.getElementById('join-room-input');
+    if (input && input.value.trim()) {
+        joinRoom(input.value.trim());
+    }
+}
+
+/**
+ * Sets up data and lifecycle event listeners for an incoming or outgoing peer connection.
+ * @param {DataConnection} conn - The PeerJS data connection instance.
+ */
+function setupPeerConnection(conn) {
+    conn.on('open', () => {
+        activeConnections.push(conn);
+        updateCollabStatus(`Connected (${activeConnections.length} collaborator)`, 'connected');
+        updateCollabModalUI();
+
+        // If hosting, transmit initial snapshot of all notes and sections
+        if (isHostingRoom) {
+            conn.send({
+                type: 'SYNC_ALL',
+                notes: notes,
+                sections: sections
+            });
+        }
+    });
+
+    conn.on('data', (data) => {
+        handlePeerData(data);
+    });
+
+    conn.on('close', () => {
+        activeConnections = activeConnections.filter(c => c !== conn);
+        if (activeConnections.length === 0) {
+            if (isHostingRoom) {
+                updateCollabStatus(`Room active: ${currentRoomCode} (waiting for partner)`, 'hosting');
+            } else {
+                updateCollabStatus('Disconnected from room', 'offline');
+            }
+        } else {
+            updateCollabStatus(`Connected (${activeConnections.length} collaborator)`, 'connected');
+        }
+        updateCollabModalUI();
+    });
+
+    conn.on('error', (err) => {
+        console.error('Peer connection error:', err);
+    });
+}
+
+/**
+ * Handles incoming real-time synchronization payloads received from peer connections.
+ * Merges updates into current editor view and writes to browser local storage.
+ * @param {Object} data - The message payload transmitted by a peer.
+ */
+function handlePeerData(data) {
+    if (!data || !data.type) return;
+
+    isApplyingRemoteUpdate = true;
+
+    try {
+        if (data.type === 'SYNC_ALL') {
+            // Initial synchronization of all notes and sections from host
+            if (Array.isArray(data.notes)) {
+                notes = data.notes;
+                localStorage.setItem('my-notes', JSON.stringify(notes));
+            }
+            if (Array.isArray(data.sections)) {
+                sections = data.sections;
+                localStorage.setItem('my-sections', JSON.stringify(sections));
+            }
+            renderNotes();
+            if (notes.length > 0 && activeNoteIndex === null) {
+                loadNote(0);
+            }
+        } else if (data.type === 'NOTE_EDIT_LIVE') {
+            // Live typing update
+            if (typeof data.index === 'number' && notes[data.index]) {
+                notes[data.index].title = data.title;
+                notes[data.index].body = data.body;
+
+                // Update active editor inputs if viewing the edited note
+                if (activeNoteIndex === data.index) {
+                    const titleEl = document.getElementById('note-title');
+                    const bodyEl = document.getElementById('note-body');
+                    if (titleEl && titleEl.value !== data.title) {
+                        titleEl.value = data.title;
+                    }
+                    if (bodyEl && bodyEl.innerHTML !== data.body) {
+                        bodyEl.innerHTML = data.body;
+                    }
+                }
+                renderNotes();
+            }
+        } else if (data.type === 'NOTE_SAVED') {
+            // Saved note state update
+            if (typeof data.index === 'number' && data.note) {
+                if (data.index < notes.length) {
+                    notes[data.index] = data.note;
+                } else {
+                    notes.unshift(data.note);
+                }
+                localStorage.setItem('my-notes', JSON.stringify(notes));
+                renderNotes();
+            }
+        } else if (data.type === 'NOTE_DELETED') {
+            // Note removal event
+            if (typeof data.index === 'number' && data.index < notes.length) {
+                notes.splice(data.index, 1);
+                localStorage.setItem('my-notes', JSON.stringify(notes));
+                if (activeNoteIndex === data.index) {
+                    activeNoteIndex = null;
+                    document.getElementById('note-title').value = '';
+                    document.getElementById('note-body').innerHTML = '';
+                } else if (activeNoteIndex > data.index) {
+                    activeNoteIndex--;
+                }
+                renderNotes();
+            }
+        } else if (data.type === 'NOTE_MOVED') {
+            // Note sub-section branch movement
+            if (typeof data.index === 'number' && notes[data.index]) {
+                notes[data.index].section = data.section;
+                localStorage.setItem('my-notes', JSON.stringify(notes));
+                renderNotes();
+            }
+        }
+    } finally {
+        isApplyingRemoteUpdate = false;
+    }
+}
+
+/**
+ * Broadcasts an event payload to all open active peer connections.
+ * @param {Object} message - The payload object to transmit.
+ */
+function broadcastCollabMessage(message) {
+    activeConnections.forEach(conn => {
+        if (conn && conn.open) {
+            try {
+                conn.send(message);
+            } catch (err) {
+                console.error('Failed to broadcast to peer connection:', err);
+            }
+        }
+    });
+}
+
+/**
+ * Disconnects all active peer connections, closes the peer instance, and resets UI.
+ */
+function disconnectCollab() {
+    activeConnections.forEach(conn => {
+        try {
+            conn.close();
+        } catch (e) {}
+    });
+    activeConnections = [];
+
+    if (peerInstance) {
+        try {
+            peerInstance.destroy();
+        } catch (e) {}
+        peerInstance = null;
+    }
+
+    currentRoomCode = null;
+    isHostingRoom = false;
+
+    updateCollabStatus('Not Connected', 'offline');
+    updateCollabModalUI();
+}
+
+/**
+ * Copies the full URL with the active room parameter to clipboard for 1-click joining.
+ */
+function copyCollabLink() {
+    if (!currentRoomCode) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('room', currentRoomCode);
+    const shareUrl = url.toString();
+
+    navigator.clipboard.writeText(shareUrl).then(() => {
+        const copyBtn = document.getElementById('copy-link-btn');
+        if (copyBtn) {
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = 'Link Copied!';
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+            }, 2000);
+        }
+    }).catch(() => {
+        window.prompt('Copy this collaboration link:', shareUrl);
+    });
+}
+
+// Check URL query parameters for ?room=ROOMCODE on page launch
+const urlParams = new URLSearchParams(window.location.search);
+const sharedRoomParam = urlParams.get('room');
+if (sharedRoomParam) {
+    setTimeout(() => {
+        openCollabModal();
+        joinRoom(sharedRoomParam);
+    }, 400);
+}
