@@ -45,7 +45,7 @@
   --btn-border: #333333;
   --btn-hover: #2a2a2a;
   --btn-text: #c9c9c9;
-  --shadow-dropdown: 0 10px 24px rgba(0,0,0,0.45);
+  --shadow-dropdown: 0 10px 24px rgba(0, 0, 0, 0.45);
   --color-active-ring: #ffffff;
   --accent-blue: #6b6bf0;
   --accent-blue-bg: rgba(107, 107, 240, 0.15);
@@ -82,14 +82,17 @@
   --accent-blue: #8a2be2;
   --accent-blue-bg: rgba(138, 43, 226, 0.1);
 }
+
 [data-accent="green"] {
   --accent-blue: #2e7d32;
   --accent-blue-bg: rgba(46, 125, 50, 0.1);
 }
+
 [data-accent="orange"] {
   --accent-blue: #d9730d;
   --accent-blue-bg: rgba(217, 115, 13, 0.1);
 }
+
 [data-accent="pink"] {
   --accent-blue: #d81b60;
   --accent-blue-bg: rgba(216, 27, 96, 0.1);
@@ -194,11 +197,61 @@ body {
   position: relative;
 }
 
-/* ── App Launch Version Badge (Top Right Corner) ── */
-.app-version-badge {
+/* ── Top Right Header Badges Container ── */
+.header-badges-row {
   position: absolute;
   top: 2rem;
   right: 2.5rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 10;
+}
+
+/* Live Collaboration Status Pill Badge */
+.collab-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 5px 11px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.collab-status-badge:hover {
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.collab-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #888888;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.collab-status-badge.connected .collab-status-dot {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+}
+
+.collab-status-badge.hosting .collab-status-dot {
+  background: #eab308;
+  box-shadow: 0 0 8px rgba(234, 179, 8, 0.6);
+}
+
+/* ── App Launch Version Badge ── */
+.app-version-badge {
+  position: static;
   background: var(--bg-hover);
   color: var(--text-secondary);
   font-size: 0.9rem;
@@ -312,7 +365,8 @@ h1 {
   display: block;
 }
 
-#note-body ul, #note-body ol {
+#note-body ul,
+#note-body ol {
   padding-left: 24px;
   margin: 6px 0;
 }
@@ -326,7 +380,10 @@ h1 {
 }
 
 /* Editor Action Row Buttons (New Note, Import Note, Export Note) */
-#save-btn, #export-btn, #new-note-btn, #import-btn {
+#save-btn,
+#export-btn,
+#new-note-btn,
+#import-btn {
   background: var(--btn-bg);
   color: var(--btn-text);
   border: 1px solid var(--btn-border);
@@ -338,7 +395,10 @@ h1 {
   transition: all 0.2s ease;
 }
 
-#save-btn:hover, #export-btn:hover, #new-note-btn:hover, #import-btn:hover {
+#save-btn:hover,
+#export-btn:hover,
+#new-note-btn:hover,
+#import-btn:hover {
   background: var(--bg-hover);
   border-color: var(--border-strong);
 }
@@ -353,7 +413,8 @@ h1 {
   margin: 4px 0;
 }
 
-#new-note-btn:hover, #save-btn:hover {
+#new-note-btn:hover,
+#save-btn:hover {
   background: var(--bg-hover);
   border-color: var(--border-strong);
   transform: translateY(-1px);
@@ -390,7 +451,8 @@ h1 {
   flex-wrap: wrap;
 }
 
-#font-btn, #font-size-btn {
+#font-btn,
+#font-size-btn {
   background: var(--btn-bg);
   color: var(--btn-text);
   border: 1px solid var(--btn-border);
@@ -402,12 +464,14 @@ h1 {
   white-space: nowrap;
 }
 
-#font-btn:hover, #font-size-btn:hover {
+#font-btn:hover,
+#font-size-btn:hover {
   background: var(--bg-hover);
   border-color: var(--border-strong);
 }
 
-.font-menu, .font-size-menu {
+.font-menu,
+.font-size-menu {
   display: none;
   position: absolute;
   top: calc(100% + 4px);
@@ -421,11 +485,13 @@ h1 {
   min-width: 170px;
 }
 
-.font-menu.open, .font-size-menu.open {
+.font-menu.open,
+.font-size-menu.open {
   display: block;
 }
 
-.font-menu button, .font-size-menu button {
+.font-menu button,
+.font-size-menu button {
   width: 100%;
   background: transparent;
   border: none;
@@ -437,7 +503,8 @@ h1 {
   transition: background 0.15s;
 }
 
-.font-menu button:hover, .font-size-menu button:hover {
+.font-menu button:hover,
+.font-size-menu button:hover {
   background: var(--bg-hover);
   color: var(--accent-blue);
 }
@@ -462,7 +529,7 @@ h1 {
   cursor: pointer;
   padding: 0;
   transition: transform 0.15s, border-color 0.15s;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .colour-btn:hover {
@@ -513,7 +580,13 @@ h1 {
   letter-spacing: 0.02em;
 }
 
-.add-section-btn {
+.sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar-action-btn {
   background: transparent;
   border: 1px solid var(--border-color);
   color: var(--text-secondary);
@@ -525,9 +598,21 @@ h1 {
   transition: all 0.15s ease;
 }
 
-.add-section-btn:hover {
+.sidebar-action-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.collab-header-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.collab-header-btn:hover {
+  background: var(--bg-hover);
+  color: rgb(186, 6, 186);
   border-color: var(--border-strong);
 }
 
@@ -861,7 +946,7 @@ h1 {
   padding: 0;
   background: var(--bg-dropdown);
   color: var(--text-primary);
-  box-shadow: 0 20px 48px rgba(0,0,0,0.3);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.3);
   max-width: 700px;
   width: 90vw;
   max-height: 80vh;
@@ -961,7 +1046,7 @@ h1 {
   background: var(--bg-body);
   color: var(--text-primary);
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .settings-content {
@@ -1058,12 +1143,20 @@ h1 {
   width: 32px;
   height: 20px;
   border-radius: 4px;
-  border: 1px solid rgba(0,0,0,0.15);
+  border: 1px solid rgba(0, 0, 0, 0.15);
 }
 
-.light-preview { background: #ffffff; }
-.dark-preview { background: #191919; }
-.sepia-preview { background: #f4ebd9; }
+.light-preview {
+  background: #ffffff;
+}
+
+.dark-preview {
+  background: #191919;
+}
+
+.sepia-preview {
+  background: #f4ebd9;
+}
 
 .accent-picker {
   display: flex;
@@ -1106,7 +1199,10 @@ h1 {
 .slider {
   position: absolute;
   cursor: pointer;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background-color: var(--border-strong);
   transition: .2s;
   border-radius: 24px;
@@ -1124,11 +1220,11 @@ h1 {
   border-radius: 50%;
 }
 
-input:checked + .slider {
+input:checked+.slider {
   background-color: var(--accent-blue);
 }
 
-input:checked + .slider:before {
+input:checked+.slider:before {
   transform: translateX(20px);
 }
 
@@ -1176,7 +1272,7 @@ input:checked + .slider:before {
   padding: 0;
   background: var(--bg-dropdown);
   color: var(--text-primary);
-  box-shadow: 0 20px 48px rgba(0,0,0,0.35);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.35);
   max-width: 400px;
   width: 90vw;
   margin: auto;
@@ -1220,7 +1316,7 @@ input:checked + .slider:before {
   border-radius: 50%;
   border: 2px solid var(--border-strong);
   display: inline-block;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .color-picker-body {
@@ -1252,7 +1348,7 @@ input:checked + .slider:before {
   cursor: pointer;
   padding: 0;
   transition: transform 0.15s ease, border-color 0.15s ease;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .swatch-btn:hover {
@@ -1347,7 +1443,10 @@ input:checked + .slider:before {
   pointer-events: none;
 }
 
-@media (max-width: 768px), (max-height: 550px) and (orientation: landscape), (max-width: 1024px) and (orientation: landscape) and (hover: none) and (pointer: coarse) {
+@media (max-width: 768px),
+(max-height: 550px) and (orientation: landscape),
+(max-width: 1024px) and (orientation: landscape) and (hover: none) and (pointer: coarse) {
+
   /* App layout container */
   .app-layout {
     position: relative;
@@ -1386,7 +1485,7 @@ input:checked + .slider:before {
   }
 
   /* Show backdrop when mobile sidebar is open */
-  .sidebar:not(.collapsed) ~ .sidebar-backdrop {
+  .sidebar:not(.collapsed)~.sidebar-backdrop {
     display: block;
     opacity: 1;
     pointer-events: auto;
@@ -1432,10 +1531,19 @@ input:checked + .slider:before {
     font-size: 0.85rem;
   }
 
-  /* Version badge in top right on mobile */
-  .app-version-badge {
+  /* Header badges row in top right on mobile */
+  .header-badges-row {
     top: max(1rem, calc(env(safe-area-inset-top) + 0.5rem));
     right: max(1rem, calc(env(safe-area-inset-right) + 0.5rem));
+    gap: 8px;
+  }
+
+  .collab-status-badge {
+    font-size: 0.72rem;
+    padding: 3px 8px;
+  }
+
+  .app-version-badge {
     font-size: 0.8rem;
     padding: 3px 10px;
   }
@@ -1470,7 +1578,10 @@ input:checked + .slider:before {
     position: relative;
   }
 
-  #bullet-btn, #bullet-style-btn, #font-btn, #font-size-btn {
+  #bullet-btn,
+  #bullet-style-btn,
+  #font-btn,
+  #font-size-btn {
     font-size: 0.82rem;
     padding: 6px 10px;
     min-height: 36px;
@@ -1515,7 +1626,10 @@ input:checked + .slider:before {
     margin-top: 1rem;
   }
 
-  #save-btn, #export-btn, #new-note-btn, #import-btn {
+  #save-btn,
+  #export-btn,
+  #new-note-btn,
+  #import-btn {
     flex: 1 1 calc(50% - 4px);
     min-width: 130px;
     text-align: center;
@@ -1613,6 +1727,7 @@ input:checked + .slider:before {
    Compresses spacing, headers, and toolbars when phone is rotated horizontally
    ────────────────────────────────────────────────────────── */
 @media (max-height: 550px) and (orientation: landscape) {
+
   /* Sidebar safe area insets in landscape */
   .sidebar {
     padding-top: max(1.25rem, calc(env(safe-area-inset-top) + 0.5rem));
@@ -1685,7 +1800,10 @@ input:checked + .slider:before {
     gap: 4px;
   }
 
-  #bullet-btn, #bullet-style-btn, #font-btn, #font-size-btn {
+  #bullet-btn,
+  #bullet-style-btn,
+  #font-btn,
+  #font-size-btn {
     font-size: 0.78rem;
     padding: 4px 8px;
     min-height: 30px;
@@ -1718,7 +1836,10 @@ input:checked + .slider:before {
     gap: 6px;
   }
 
-  #save-btn, #export-btn, #new-note-btn, #import-btn {
+  #save-btn,
+  #export-btn,
+  #new-note-btn,
+  #import-btn {
     min-height: 34px;
     padding: 6px 10px;
     font-size: 0.8rem;
@@ -1740,4 +1861,249 @@ input:checked + .slider:before {
     max-height: 92vh;
     max-height: 92dvh;
   }
+
+  /* Collaboration header badges and modal in landscape */
+  .header-badges-row {
+    top: max(0.5rem, env(safe-area-inset-top));
+    right: max(1rem, calc(env(safe-area-inset-right) + 0.5rem));
+    gap: 6px;
+  }
+
+  .collab-status-badge {
+    font-size: 0.68rem;
+    padding: 2px 7px;
+  }
+
+  .collab-dialog {
+    max-height: 92vh;
+    max-height: 92dvh;
+    overflow-y: auto;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────
+   REAL-TIME COLLABORATION MODAL STYLES
+   Styling for peer-to-peer room creation, join input, and status cards
+   ────────────────────────────────────────────────────────── */
+.collab-dialog {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0;
+  background: var(--bg-dropdown);
+  color: var(--text-primary);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  max-width: 480px;
+  width: 90vw;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  backdrop-filter: blur(8px);
+}
+
+.collab-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.collab-modal-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.collab-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-sidebar);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+.collab-header-title h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.collab-header-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.collab-modal-body {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.collab-status-card {
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.status-indicator-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collab-status-pulse {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #888888;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.collab-status-card.connected .collab-status-pulse {
+  background: #22c55e;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.8);
+}
+
+.collab-status-card.hosting .collab-status-pulse {
+  background: #eab308;
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.8);
+}
+
+.collab-status-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.collab-status-subtext {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.collab-section-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.collab-card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.collab-card-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.room-display-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--bg-hover);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  margin-top: 4px;
+}
+
+.room-code-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.room-code-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.room-code-value {
+  font-family: monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-primary);
+}
+
+.join-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.join-room-input {
+  flex: 1;
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-family: monospace;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.join-room-input:focus {
+  border-color: var(--border-strong);
+}
+
+.collab-action-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.collab-action-btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.collab-action-btn.primary-btn {
+  background: var(--text-primary);
+  color: var(--bg-body);
+  border: 1px solid var(--border-strong);
+}
+
+.collab-action-btn.primary-btn:hover {
+  opacity: 0.88;
+}
+
+.collab-action-btn.danger-btn {
+  background: rgba(212, 76, 71, 0.15);
+  color: #d44c47;
+  border-color: rgba(212, 76, 71, 0.3);
+}
+
+.collab-action-btn.danger-btn:hover {
+  background: rgba(212, 76, 71, 0.25);
+}
+
+.collab-footer-note {
+  border-top: 1px solid var(--border-color);
+  padding-top: 10px;
+}
+
+.collab-footer-note p {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
