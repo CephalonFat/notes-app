@@ -15,6 +15,9 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Playfair+Display&family=Inter&family=Lato&family=Merriweather&display=swap"
     rel="stylesheet">
+  <!-- PeerJS Client Library for Serverless Real-Time Peer-to-Peer Note Sync -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
   <link rel="stylesheet" href="style.css" />
 </head>
 
@@ -26,10 +29,13 @@
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-top">
-        <!-- Sidebar Header with Recents title and Add Section Button -->
+        <!-- Sidebar Header with Recents title, Add Section, and Real-Time Collaboration Button -->
         <div class="sidebar-header">
           <span class="sidebar-title">Recents</span>
-          <button id="add-section-btn" class="add-section-btn" onclick="promptCreateSection()" title="Create new sub-section">+ Section</button>
+          <div class="sidebar-header-actions">
+            <button id="collab-open-btn" class="sidebar-action-btn collab-header-btn" onclick="openCollabModal()" title="Real-Time Shared Notes">Share</button>
+            <button id="add-section-btn" class="sidebar-action-btn add-section-btn" onclick="promptCreateSection()" title="Create new sub-section">+ Section</button>
+          </div>
         </div>
 
         <div id="notes-list" class="notes-list"></div>
@@ -57,8 +63,14 @@
     <!-- Main editor -->
     <main class="main-content">
 
-      <!-- Launch Version Badge (Top Right Corner) -->
-      <div class="app-version-badge" title="Draftly Launch Version">v1.1</div>
+      <!-- Top Right Header Badges (Live Shared Status & Version Badge) -->
+      <div class="header-badges-row">
+        <div id="collab-status-badge" class="collab-status-badge" onclick="openCollabModal()" title="Shared Session Status">
+          <span class="collab-status-dot"></span>
+          <span id="collab-status-text">Not Connected</span>
+        </div>
+        <div class="app-version-badge" title="Draftly Launch Version">v1.1</div>
+      </div>
 
       <button id="sidebar-toggle" onclick="toggleSidebar()">
         ❮
@@ -366,6 +378,63 @@
             </div>
           </div>
 
+        </div>
+      </div>
+    </div>
+  </dialog>
+ 
+  <!-- Real-Time Shared Notes Collaboration Dialog -->
+  <dialog id="collab-modal" class="collab-dialog">
+    <div class="collab-modal-container">
+      <div class="collab-modal-header">
+        <div class="collab-header-title">
+          <h3>Real-Time Shared Notes</h3>
+          <p class="collab-header-subtitle">Collaborate live with another person on your notes</p>
+        </div>
+        <button class="modal-close-btn" onclick="closeCollabModal()" title="Close dialog">✕</button>
+      </div>
+
+      <div class="collab-modal-body">
+        <!-- Status Banner -->
+        <div class="collab-status-card" id="collab-status-card">
+          <div class="status-indicator-row">
+            <span class="collab-status-pulse" id="collab-status-pulse"></span>
+            <span class="collab-status-label" id="collab-status-detail">No active shared session</span>
+          </div>
+          <p class="collab-status-subtext" id="collab-status-subtext">Start a room or join with a room code to sync notes in real time.</p>
+        </div>
+
+        <!-- Host / Share Section -->
+        <div class="collab-section-card">
+          <h4 class="collab-card-title">Share Your Notes (Host Room)</h4>
+          <p class="collab-card-desc">Generate a secure room code and invite link to let someone edit notes with you live.</p>
+          
+          <div class="room-display-row" id="room-display-row" style="display: none;">
+            <div class="room-code-badge">
+              <span class="room-code-label">Room Code:</span>
+              <span class="room-code-value" id="current-room-code">------</span>
+            </div>
+            <button class="collab-action-btn primary-btn" id="copy-link-btn" onclick="copyCollabLink()">Copy Invite Link</button>
+          </div>
+
+          <div class="collab-action-buttons">
+            <button class="collab-action-btn primary-btn" id="start-host-btn" onclick="startHosting()">Start Shared Session</button>
+            <button class="collab-action-btn danger-btn" id="disconnect-btn" onclick="disconnectCollab()" style="display: none;">Disconnect Session</button>
+          </div>
+        </div>
+
+        <!-- Join Section -->
+        <div class="collab-section-card" id="collab-join-card">
+          <h4 class="collab-card-title">Join a Shared Session</h4>
+          <p class="collab-card-desc">Enter a room code sent by a partner to connect directly to their shared notes.</p>
+          <div class="join-input-group">
+            <input type="text" id="join-room-input" class="join-room-input" placeholder="e.g. ABC123" maxlength="12" />
+            <button class="collab-action-btn primary-btn" onclick="handleJoinFromInput()">Join Room</button>
+          </div>
+        </div>
+
+        <div class="collab-footer-note">
+          <p>Notes stay stored in your browser local storage and sync directly over an encrypted peer-to-peer connection.</p>
         </div>
       </div>
     </div>
