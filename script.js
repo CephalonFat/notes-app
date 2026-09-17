@@ -60,10 +60,65 @@ let saveTimeout;
 let bulletsEnabled  = false;
 let currentBullet   = '•';
 
+/**
+ * Generates a globally unique identifier for a note.
+ * Combines current timestamp with pseudo-random characters to guarantee uniqueness across devices.
+ * @returns {string} The unique note identifier string.
+ */
+function generateNoteId() {
+    return 'note_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 9);
+}
+
+/**
+ * Removes duplicate notes that share the exact same ID, or identical title, body, and section.
+ * Cleans up spurious copies created by previous synchronization loop bugs while preserving content.
+ */
+function deduplicateNotes() {
+    const seen = new Set();
+    const unique = [];
+    let removedDuplicates = false;
+
+    notes.forEach(note => {
+        // Build composite key for duplicate detection
+        const key = note.id 
+            ? ('id:' + note.id) 
+            : ('content:' + (note.section || 'General') + ':::' + (note.title || '').trim() + ':::' + (note.body || '').trim());
+            
+        if (!seen.has(key)) {
+            seen.add(key);
+            unique.push(note);
+        } else {
+            removedDuplicates = true;
+        }
+    });
+
+    if (removedDuplicates) {
+        notes = unique;
+        safeStorageSet('my-notes', JSON.stringify(notes));
+    }
+}
+
 // List of user-created notes from local storage
 let notes = [];
 try {
     notes = JSON.parse(safeStorageGet('my-notes', '[]'));
+    if (!Array.isArray(notes)) notes = [];
+    
+    // Ensure every existing note has a permanent unique ID
+    let hasUpdatedIds = false;
+    notes.forEach(note => {
+        if (!note.id) {
+            note.id = generateNoteId();
+            hasUpdatedIds = true;
+        }
+    });
+    
+    if (hasUpdatedIds) {
+        safeStorageSet('my-notes', JSON.stringify(notes));
+    }
+    
+    // Automatically clean up any duplicate notes created by previous synchronization bugs
+    deduplicateNotes();
 } catch (e) {
     notes = [];
 }
@@ -466,17 +521,22 @@ function saveNote() {
         ? (notes[activeNoteIndex].section || 'General') 
         : (activeSection || 'General');
 
-    const noteToSave = {
-        title:    title,
-        body:     bodyHtml,
-        date:     new Date().toLocaleString(),
-        font:     currentFont,
-        fontSize: currentFontSize,
-        colour:   currentColour,
-        section:  existingSection
-    };
+    // Preserve existing note ID and creation date if editing an existing note
+    const existingNote = (activeNoteIndex !== null && notes[activeNoteIndex]) ? notes[activeNoteIndex] : null;
+    const noteId = (existingNote && existingNote.id) ? existingNote.id : generateNoteId();
+    const creationDate = (existingNote && existingNote.date) ? existingNote.date : new Date().toLocaleString();
 
-    const savedIndex = activeNoteIndex === null ? 0 : activeNoteIndex;
+    const noteToSave = {
+        id:        noteId,
+        title:     title,
+        body:      bodyHtml,
+        date:      creationDate,
+        updatedAt: new Date().toLocaleString(),
+        font:      currentFont,
+        fontSize:  currentFontSize,
+        colour:    currentColour,
+        section:   existingSection
+    };
 
     if (activeNoteIndex === null) {
         notes.unshift(noteToSave);
@@ -485,7 +545,7 @@ function saveNote() {
         notes[activeNoteIndex] = noteToSave;
     }
 
-    localStorage.setItem('my-notes', JSON.stringify(notes));
+    safeStorageSet('my-notes', JSON.stringify(notes));
     renderNotes();
 
     // Broadcast saved note only if it belongs to the active shared clan section
@@ -525,6 +585,7 @@ function onEditorInput() {
             broadcastCollabMessage({
                 type: 'NOTE_EDIT_LIVE',
                 clanCode: activeClan.code,
+                id: currentNote.id,
                 date: currentNote.date,
                 title: titleEl ? titleEl.value : '',
                 body: bodyEl ? bodyEl.innerHTML : ''
@@ -747,7 +808,8 @@ function handleSectionDrop(event, sectionName) {
                 broadcastCollabMessage({
                     type: 'NOTE_DELETED',
                     clanCode: activeClan.code,
-                    date: notes[noteIndex].date
+                    id: notes[noteIndex] ? notes[noteIndex].id : null,
+                    date: notes[noteIndex] ? notes[noteIndex].date : null
                 });
             }
         }
@@ -917,10 +979,11 @@ function renderNotes() {
 function deleteNote(index) {
     const noteToDelete = notes[index];
     const isClan = typeof isClanNote === 'function' ? isClanNote(noteToDelete) : false;
+    const noteId = noteToDelete ? noteToDelete.id : null;
     const noteDate = noteToDelete ? noteToDelete.date : null;
 
     notes.splice(index, 1);
-    localStorage.setItem('my-notes', JSON.stringify(notes));
+    safeStorageSet('my-notes', JSON.stringify(notes));
 
     if (activeNoteIndex === index) {
         activeNoteIndex = null;
@@ -937,6 +1000,7 @@ function deleteNote(index) {
         broadcastCollabMessage({
             type: 'NOTE_DELETED',
             clanCode: activeClan.code,
+            id: noteId,
             date: noteDate
         });
     }
@@ -1011,8 +1075,9 @@ function handleFileImport(event) {
             formattedBody = escapeHtml(fileContent).replace(/\r\n|\r|\n/g, '<br>');
         }
 
-        // Create new imported note object with default font, color, and section settings
+        // Create new imported note object with persistent ID, default font, color, and section settings
         const importedNote = {
+            id: generateNoteId(), // Assign persistent unique ID to prevent sync collisions
             title: fileName,
             body: formattedBody,
             date: new Date().toLocaleString(),
@@ -1026,8 +1091,8 @@ function handleFileImport(event) {
         notes.unshift(importedNote);
         activeNoteIndex = 0;
 
-        // Persist updated notebook list to LocalStorage
-        localStorage.setItem('my-notes', JSON.stringify(notes));
+        // Persist updated notebook list to LocalStorage safely
+        safeStorageSet('my-notes', JSON.stringify(notes));
 
         // Load newly imported note into editor UI & refresh sidebar recents list
         loadNote(0);
@@ -1707,36 +1772,61 @@ function handlePeerData(data) {
             // Update clan name if sent
             if (data.clanName && activeClan.name !== data.clanName) {
                 activeClan.name = data.clanName;
-                localStorage.setItem('draftly-clan', JSON.stringify(activeClan));
+                safeStorageSet('draftly-clan', JSON.stringify(activeClan));
             }
 
             // Extract existing personal notes (must remain untouched)
             const personalNotes = notes.filter(n => !isClanNote(n));
 
-            // Merge incoming clan notes
+            // Merge incoming clan notes with unique ID tracking
             const incomingClanNotes = (data.notes || []).map(n => ({
                 ...n,
+                id: n.id || generateNoteId(),
                 section: activeClan.name
             }));
 
+            // Deduplicate incoming notes against existing clan notes by ID or content
+            const mergedClanNotes = [];
+            const seenKeys = new Set();
+
+            incomingClanNotes.forEach(n => {
+                const key = n.id || (n.title + ':::' + n.body);
+                if (!seenKeys.has(key)) {
+                    seenKeys.add(key);
+                    mergedClanNotes.push(n);
+                }
+            });
+
+            // Retain existing local clan notes not present in incoming list
+            notes.filter(n => isClanNote(n)).forEach(localNote => {
+                const key = localNote.id || (localNote.title + ':::' + localNote.body);
+                if (!seenKeys.has(key)) {
+                    seenKeys.add(key);
+                    mergedClanNotes.push(localNote);
+                }
+            });
+
             // Combine into unified notebook
-            notes = [...incomingClanNotes, ...personalNotes];
-            localStorage.setItem('my-notes', JSON.stringify(notes));
+            notes = [...mergedClanNotes, ...personalNotes];
+            safeStorageSet('my-notes', JSON.stringify(notes));
 
             // Ensure clan section exists
             if (!sections.includes(activeClan.name)) {
                 sections.push(activeClan.name);
-                localStorage.setItem('my-sections', JSON.stringify(sections));
+                safeStorageSet('my-sections', JSON.stringify(sections));
             }
 
             renderNotes();
             updateCollabModalUI();
         } else if (data.type === 'NOTE_EDIT_LIVE') {
-            // Live typing update for a clan note
-            const targetNote = notes.find(n => isClanNote(n) && n.date === data.date);
+            // Live typing update for a clan note matched by persistent ID or legacy date
+            const targetNote = notes.find(n => isClanNote(n) && (
+                (data.id && n.id === data.id) || (data.date && n.date === data.date)
+            ));
             if (targetNote) {
                 targetNote.title = data.title;
                 targetNote.body = data.body;
+                if (data.id && !targetNote.id) targetNote.id = data.id;
 
                 // Update active editor inputs if viewing this note
                 if (activeNoteIndex !== null && notes[activeNoteIndex] === targetNote) {
@@ -1756,35 +1846,62 @@ function handlePeerData(data) {
             if (data.note) {
                 const incomingNote = {
                     ...data.note,
+                    id: data.note.id || generateNoteId(),
                     section: activeClan.name
                 };
 
-                const existingIndex = notes.findIndex(n => isClanNote(n) && n.date === incomingNote.date);
+                // Match by unique persistent ID first, or fallback to exact matching
+                const existingIndex = notes.findIndex(n => isClanNote(n) && (
+                    (incomingNote.id && n.id === incomingNote.id) ||
+                    (!incomingNote.id && n.date === incomingNote.date) ||
+                    (!n.id && n.title === incomingNote.title && n.body === incomingNote.body)
+                ));
+
                 if (existingIndex !== -1) {
-                    notes[existingIndex] = incomingNote;
+                    // Update note in-place without creating a duplicate copy
+                    notes[existingIndex] = {
+                        ...notes[existingIndex],
+                        ...incomingNote
+                    };
+
+                    // If currently viewing this note in editor, update editor view
+                    if (activeNoteIndex === existingIndex) {
+                        const titleEl = document.getElementById('note-title');
+                        const bodyEl = document.getElementById('note-body');
+                        if (titleEl && titleEl.value !== incomingNote.title) {
+                            titleEl.value = incomingNote.title;
+                        }
+                        if (bodyEl && bodyEl.innerHTML !== incomingNote.body) {
+                            bodyEl.innerHTML = incomingNote.body;
+                        }
+                    }
                 } else {
+                    // Genuine new note created by peer
                     notes.unshift(incomingNote);
+                    if (activeNoteIndex !== null) {
+                        activeNoteIndex++;
+                    }
                 }
 
-                localStorage.setItem('my-notes', JSON.stringify(notes));
+                safeStorageSet('my-notes', JSON.stringify(notes));
                 renderNotes();
             }
         } else if (data.type === 'NOTE_DELETED') {
-            // Removed clan note
-            if (data.date) {
-                const deleteIndex = notes.findIndex(n => isClanNote(n) && n.date === data.date);
-                if (deleteIndex !== -1) {
-                    notes.splice(deleteIndex, 1);
-                    localStorage.setItem('my-notes', JSON.stringify(notes));
-                    if (activeNoteIndex === deleteIndex) {
-                        activeNoteIndex = null;
-                        document.getElementById('note-title').value = '';
-                        document.getElementById('note-body').innerHTML = '';
-                    } else if (activeNoteIndex > deleteIndex) {
-                        activeNoteIndex--;
-                    }
-                    renderNotes();
+            // Removed clan note matched by persistent ID or legacy date
+            const deleteIndex = notes.findIndex(n => isClanNote(n) && (
+                (data.id && n.id === data.id) || (data.date && n.date === data.date)
+            ));
+            if (deleteIndex !== -1) {
+                notes.splice(deleteIndex, 1);
+                safeStorageSet('my-notes', JSON.stringify(notes));
+                if (activeNoteIndex === deleteIndex) {
+                    activeNoteIndex = null;
+                    document.getElementById('note-title').value = '';
+                    document.getElementById('note-body').innerHTML = '';
+                } else if (activeNoteIndex > deleteIndex) {
+                    activeNoteIndex--;
                 }
+                renderNotes();
             }
         }
     } finally {
