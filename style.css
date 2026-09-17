@@ -612,8 +612,27 @@ h1 {
 
 .collab-header-btn:hover {
   background: var(--bg-hover);
-  color: rgb(186, 6, 186);
+  color: var(--text-primary);
   border-color: var(--border-strong);
+}
+
+/* Clan Section Badge and Accent in Sidebar */
+.clan-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-hover-strong);
+  color: var(--text-secondary);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.sidebar-section.clan-section {
+  border-left: 2px solid var(--border-strong);
+  padding-left: 4px;
 }
 
 /* ── Sidebar Sub-sections (Branches / Folders) ── */
