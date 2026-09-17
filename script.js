@@ -1,4 +1,4 @@
-let currentTheme = localStorage.getItem('theme') || 'light';
+ localStorage.getItem('theme') || 'light';
 let currentAccent = localStorage.getItem('accent') || 'blue';
 let currentLineHeight = localStorage.getItem('lineHeight') || '1.8';
 let currentPageWidth = localStorage.getItem('pageWidth') || '680px';
@@ -26,6 +26,35 @@ let notes = JSON.parse(localStorage.getItem('my-notes') || '[]');
 let sections = JSON.parse(localStorage.getItem('my-sections') || '["General"]');
 let collapsedSections = JSON.parse(localStorage.getItem('collapsed-sections') || '{}');
 let activeSection = 'General';
+
+// Prefix applied to clan room codes to prevent ID collisions on public PeerJS relay
+const PEER_ROOM_PREFIX = 'draftly-clan-';
+
+// Active Clan membership profile loaded from browser local storage
+let activeClan = null;
+try {
+    activeClan = JSON.parse(localStorage.getItem('draftly-clan') || 'null');
+} catch (e) {
+    activeClan = null;
+}
+
+// PeerJS network and connection state tracking
+let peerInstance = null;
+let activeConnections = [];
+let isApplyingRemoteUpdate = false;
+let clanReconnectTimer = null;
+let isHostingClan = false;
+
+/**
+ * Checks if a given note belongs to the active shared clan section.
+ * Notes outside the clan section are considered private personal notes.
+ * @param {Object} note - The note object to check.
+ * @returns {boolean} True if the note is a clan shared note.
+ */
+function isClanNote(note) {
+    if (!activeClan || !note) return false;
+    return note.section === activeClan.name;
+}
 
 const defaultColoursLight = [
     "#37352f", "#787774", "#d44c47", "#d9730d",
@@ -402,11 +431,11 @@ function saveNote() {
     localStorage.setItem('my-notes', JSON.stringify(notes));
     renderNotes();
 
-    // Broadcast saved note to connected peer collaborators
-    if (!isApplyingRemoteUpdate && typeof activeConnections !== 'undefined' && activeConnections.length > 0) {
+    // Broadcast saved note only if it belongs to the active shared clan section
+    if (!isApplyingRemoteUpdate && typeof activeConnections !== 'undefined' && activeConnections.length > 0 && typeof isClanNote === 'function' && isClanNote(noteToSave)) {
         broadcastCollabMessage({
             type: 'NOTE_SAVED',
-            index: savedIndex,
+            clanCode: activeClan.code,
             note: noteToSave
         });
     }
@@ -425,21 +454,25 @@ function scheduleAutoSave() {
  
 /**
   * Handles live text input in the note editor.
-  * Triggers auto-save timer and broadcasts real-time keystroke updates to connected peers.
+  * Triggers auto-save timer and broadcasts real-time keystroke updates to connected clan members.
   */
 function onEditorInput() {
     scheduleAutoSave();
 
-    // Broadcast live typing if collaborating in an active room session
+    // Broadcast live typing only if editing a note inside the active shared clan section
     if (!isApplyingRemoteUpdate && typeof activeConnections !== 'undefined' && activeConnections.length > 0 && activeNoteIndex !== null) {
-        const titleEl = document.getElementById('note-title');
-        const bodyEl = document.getElementById('note-body');
-        broadcastCollabMessage({
-            type: 'NOTE_EDIT_LIVE',
-            index: activeNoteIndex,
-            title: titleEl ? titleEl.value : '',
-            body: bodyEl ? bodyEl.innerHTML : ''
-        });
+        const currentNote = notes[activeNoteIndex];
+        if (typeof isClanNote === 'function' && isClanNote(currentNote)) {
+            const titleEl = document.getElementById('note-title');
+            const bodyEl = document.getElementById('note-body');
+            broadcastCollabMessage({
+                type: 'NOTE_EDIT_LIVE',
+                clanCode: activeClan.code,
+                date: currentNote.date,
+                title: titleEl ? titleEl.value : '',
+                body: bodyEl ? bodyEl.innerHTML : ''
+            });
+        }
     }
 }
 
@@ -633,6 +666,7 @@ function handleSectionDrop(event, sectionName) {
     const noteIndex = indexStr !== '' ? parseInt(indexStr, 10) : draggedNoteIndex;
 
     if (noteIndex !== null && !isNaN(noteIndex) && noteIndex >= 0 && noteIndex < notes.length) {
+        const oldSection = notes[noteIndex].section;
         // Update note's section assignment
         notes[noteIndex].section = sectionName;
         // Auto-expand destination section so the user sees their moved note
@@ -642,13 +676,23 @@ function handleSectionDrop(event, sectionName) {
         localStorage.setItem('collapsed-sections', JSON.stringify(collapsedSections));
         renderNotes();
 
-        // Broadcast note relocation to connected peer collaborators
-        if (!isApplyingRemoteUpdate && typeof activeConnections !== 'undefined' && activeConnections.length > 0) {
-            broadcastCollabMessage({
-                type: 'NOTE_MOVED',
-                index: noteIndex,
-                section: sectionName
-            });
+        // Broadcast relocation if moving into or out of the clan section
+        if (!isApplyingRemoteUpdate && typeof activeConnections !== 'undefined' && activeConnections.length > 0 && typeof activeClan !== 'undefined' && activeClan) {
+            if (sectionName === activeClan.name) {
+                // Moved into clan: share note with clan
+                broadcastCollabMessage({
+                    type: 'NOTE_SAVED',
+                    clanCode: activeClan.code,
+                    note: notes[noteIndex]
+                });
+            } else if (oldSection === activeClan.name) {
+                // Moved out of clan into personal: remove from other clan members
+                broadcastCollabMessage({
+                    type: 'NOTE_DELETED',
+                    clanCode: activeClan.code,
+                    date: notes[noteIndex].date
+                });
+            }
         }
     }
 }
@@ -761,9 +805,11 @@ function renderNotes() {
         const sectionNotes = grouped[sectionName] || [];
         const isCollapsed = Boolean(collapsedSections[sectionName]);
         const safeSectionName = escapeHtml(sectionName);
+        const isClan = activeClan && activeClan.name === sectionName;
+        const clanBadgeHtml = isClan ? '<span class="clan-badge">Shared</span>' : '';
 
         return `
-            <div class="sidebar-section ${isCollapsed ? 'collapsed' : ''}" 
+            <div class="sidebar-section ${isCollapsed ? 'collapsed' : ''} ${isClan ? 'clan-section' : ''}" 
                  id="section-${safeSectionName}"
                  ondragover="handleSectionDragOver(event, '${safeSectionName}')"
                  ondragleave="handleSectionDragLeave(event, '${safeSectionName}')"
@@ -772,11 +818,12 @@ function renderNotes() {
                     <div class="section-title-group">
                         <span class="section-toggle-icon">▾</span>
                         <span class="section-title">${safeSectionName}</span>
+                        ${clanBadgeHtml}
                         <span class="section-count">${sectionNotes.length}</span>
                     </div>
                     <div class="section-actions" onclick="event.stopPropagation()">
                         <button class="section-icon-btn" onclick="promptCreateNoteInSection('${safeSectionName}')" title="Add note to ${safeSectionName}">+</button>
-                        ${sectionName !== 'General' ? `
+                        ${sectionName !== 'General' && !isClan ? `
                             <button class="section-icon-btn" onclick="promptRenameSection('${safeSectionName}')" title="Rename section">✎</button>
                             <button class="section-icon-btn" onclick="confirmDeleteSection('${safeSectionName}')" title="Delete section">×</button>
                         ` : ''}
@@ -811,24 +858,29 @@ function renderNotes() {
 }
 
 function deleteNote(index) {
+    const noteToDelete = notes[index];
+    const isClan = typeof isClanNote === 'function' ? isClanNote(noteToDelete) : false;
+    const noteDate = noteToDelete ? noteToDelete.date : null;
+
     notes.splice(index, 1);
     localStorage.setItem('my-notes', JSON.stringify(notes));
 
     if (activeNoteIndex === index) {
         activeNoteIndex = null;
         document.getElementById('note-title').value = '';
-        document.getElementById('note-body').value  = '';
+        document.getElementById('note-body').innerHTML = '';
     } else if (activeNoteIndex > index) {
         activeNoteIndex--;
     }
 
     renderNotes();
 
-    // Broadcast note deletion to connected peer collaborators
-    if (!isApplyingRemoteUpdate && typeof activeConnections !== 'undefined' && activeConnections.length > 0) {
+    // Broadcast note deletion only if it was an active clan shared note
+    if (!isApplyingRemoteUpdate && typeof activeConnections !== 'undefined' && activeConnections.length > 0 && isClan && typeof activeClan !== 'undefined' && activeClan) {
         broadcastCollabMessage({
             type: 'NOTE_DELETED',
-            index: index
+            clanCode: activeClan.code,
+            date: noteDate
         });
     }
 }
@@ -863,7 +915,7 @@ document.addEventListener('click', function(e) {
 
 /**
  * Triggers the file selection dialog by clicking the hidden file input element.
- * Called when the user clicks the "📥 Import Note" button in the editor action bar.
+ * Called when the user clicks the "Import Note" button in the editor action bar.
  */
 function triggerImportFile() {
     const fileInput = document.getElementById('import-file-input');
@@ -1244,21 +1296,12 @@ if (collabModal) {
 }
 
 // ─────────────────────────────────────────
-// REAL-TIME SHARED NOTES COLLABORATION (PEERJS)
+// PERSISTENT CLAN & SHARED NOTES (PEERJS)
 // ─────────────────────────────────────────
 
-// Prefix applied to room codes to prevent ID collisions on public PeerJS relay
-const PEER_ROOM_PREFIX = 'draftly-room-';
-
-// Core peer-to-peer networking state
-let peerInstance = null;
-let activeConnections = [];
-let currentRoomCode = null;
-let isHostingRoom = false;
-let isApplyingRemoteUpdate = false;
 
 /**
- * Opens the real-time collaboration modal dialog and refreshes its UI state.
+ * Opens the Clan modal dialog and refreshes its view based on current membership.
  */
 function openCollabModal() {
     const modal = document.getElementById('collab-modal');
@@ -1269,7 +1312,7 @@ function openCollabModal() {
 }
 
 /**
- * Closes the real-time collaboration modal dialog.
+ * Closes the Clan modal dialog.
  */
 function closeCollabModal() {
     const modal = document.getElementById('collab-modal');
@@ -1293,7 +1336,7 @@ function generateRoomCode() {
 }
 
 /**
- * Updates the text, pulse indicator, and badges for collaboration status across the app.
+ * Updates the text, pulse indicator, and badges for clan status across the app.
  * @param {string} statusText - The human-readable status description.
  * @param {string} mode - The current state: 'offline', 'hosting', or 'connected'.
  */
@@ -1320,58 +1363,204 @@ function updateCollabStatus(statusText, mode = 'offline') {
 }
 
 /**
- * Updates visible buttons, room code fields, and subtexts in the collaboration modal.
+ * Updates visible views, clan name fields, and subtexts in the collaboration modal.
  */
 function updateCollabModalUI() {
-    const roomRow = document.getElementById('room-display-row');
+    const dashboardView = document.getElementById('clan-dashboard-view');
+    const setupView = document.getElementById('clan-setup-view');
+    const clanNameEl = document.getElementById('clan-dashboard-name');
     const roomCodeVal = document.getElementById('current-room-code');
-    const startHostBtn = document.getElementById('start-host-btn');
-    const disconnectBtn = document.getElementById('disconnect-btn');
-    const joinCard = document.getElementById('collab-join-card');
     const subtextEl = document.getElementById('collab-status-subtext');
 
-    if (currentRoomCode) {
-        if (roomRow) roomRow.style.display = 'flex';
-        if (roomCodeVal) roomCodeVal.textContent = currentRoomCode;
-        if (startHostBtn) startHostBtn.style.display = 'none';
-        if (disconnectBtn) disconnectBtn.style.display = 'inline-block';
-        if (joinCard) joinCard.style.display = isHostingRoom ? 'none' : 'flex';
+    if (activeClan) {
+        if (dashboardView) dashboardView.style.display = 'flex';
+        if (setupView) setupView.style.display = 'none';
+        if (clanNameEl) clanNameEl.textContent = activeClan.name;
+        if (roomCodeVal) roomCodeVal.textContent = activeClan.code;
 
         if (activeConnections.length > 0) {
-            if (subtextEl) subtextEl.textContent = 'Synchronizing notes live with connected partner.';
-        } else if (isHostingRoom) {
-            if (subtextEl) subtextEl.textContent = 'Share your room code or invite link to connect.';
+            if (subtextEl) subtextEl.textContent = 'Synchronizing with ' + activeConnections.length + ' collaborator online.';
+        } else {
+            if (subtextEl) subtextEl.textContent = 'Connected in background. Notes stay saved locally.';
         }
     } else {
-        if (roomRow) roomRow.style.display = 'none';
-        if (startHostBtn) startHostBtn.style.display = 'inline-block';
-        if (disconnectBtn) disconnectBtn.style.display = 'none';
-        if (joinCard) joinCard.style.display = 'flex';
-        if (subtextEl) subtextEl.textContent = 'Start a room or join with a room code to sync notes in real time.';
+        if (dashboardView) dashboardView.style.display = 'none';
+        if (setupView) setupView.style.display = 'flex';
     }
 }
 
 /**
- * Initiates a new hosted collaboration room session.
- * Generates a room code, connects to the PeerJS signaling broker, and listens for joiners.
+ * Handles creating a brand new Clan.
+ * Generates a unique room code, sets up the clan section, saves membership, and connects.
  */
-function startHosting() {
-    if (peerInstance) {
-        disconnectCollab();
+function handleCreateClan() {
+    const input = document.getElementById('create-clan-input');
+    const clanName = input && input.value.trim() ? input.value.trim() : 'Shared Notes';
+
+    const code = generateRoomCode();
+    activeClan = {
+        code: code,
+        name: clanName,
+        role: 'creator',
+        joinedAt: new Date().toISOString()
+    };
+
+    localStorage.setItem('draftly-clan', JSON.stringify(activeClan));
+
+    // Ensure the clan section exists in sections
+    if (!sections.includes(clanName)) {
+        sections.push(clanName);
+        localStorage.setItem('my-sections', JSON.stringify(sections));
     }
 
-    currentRoomCode = generateRoomCode();
-    isHostingRoom = true;
+    renderNotes();
+    updateCollabModalUI();
+    autoConnectClan();
+}
 
-    updateCollabStatus('Starting shared room...', 'hosting');
+/**
+ * Handles joining an existing clan via room code from input element.
+ */
+function handleJoinFromInput() {
+    const input = document.getElementById('join-room-input');
+    if (!input || !input.value.trim()) return;
 
+    const code = input.value.trim().toUpperCase();
+    joinClanByCode(code);
+}
+
+/**
+ * Joins a clan by room code and persists membership to localStorage.
+ * @param {string} code - The 6-character clan code.
+ * @param {string} [name] - Optional clan name.
+ */
+function joinClanByCode(code, name) {
+    if (!code) return;
+    const cleanCode = code.trim().toUpperCase();
+    const clanName = name || 'Shared Notes';
+
+    activeClan = {
+        code: cleanCode,
+        name: clanName,
+        role: 'member',
+        joinedAt: new Date().toISOString()
+    };
+
+    localStorage.setItem('draftly-clan', JSON.stringify(activeClan));
+
+    // Ensure the clan section exists in sections
+    if (!sections.includes(clanName)) {
+        sections.push(clanName);
+        localStorage.setItem('my-sections', JSON.stringify(sections));
+    }
+
+    renderNotes();
+    updateCollabModalUI();
+    autoConnectClan();
+}
+
+/**
+ * Disconnects from active clan, clears clan profile from localStorage,
+ * and resets the UI back to setup mode while preserving local notes.
+ */
+function confirmLeaveClan() {
+    if (!activeClan) return;
+
+    const confirmed = window.confirm(
+        'Are you sure you want to stop sharing ' + activeClan.name + '?\nAll notes currently in this section will stay saved on your device as local notes.'
+    );
+
+    if (!confirmed) return;
+
+    // Disconnect peer connections
+    activeConnections.forEach(conn => {
+        try { conn.close(); } catch (e) {}
+    });
+    activeConnections = [];
+
+    if (peerInstance) {
+        try { peerInstance.destroy(); } catch (e) {}
+        peerInstance = null;
+    }
+
+    clearTimeout(clanReconnectTimer);
+
+    // Remove clan profile from localStorage
+    localStorage.removeItem('draftly-clan');
+    activeClan = null;
+
+    updateCollabStatus('Not Sharing', 'offline');
+    updateCollabModalUI();
+    renderNotes();
+}
+
+/**
+ * Connects to the clan network in the background automatically.
+ * Implements adaptive host election: tries connecting as member; if no host exists, becomes room host.
+ */
+function autoConnectClan() {
+    if (!activeClan || !activeClan.code) return;
+
+    if (peerInstance) {
+        try { peerInstance.destroy(); } catch (e) {}
+        peerInstance = null;
+    }
+
+    updateCollabStatus(activeClan.name + ': Connecting...', 'hosting');
+
+    // Attempt to connect as client first
     try {
-        peerInstance = new Peer(PEER_ROOM_PREFIX + currentRoomCode, {
-            debug: 1
+        peerInstance = new Peer({ debug: 1 });
+
+        peerInstance.on('open', () => {
+            const conn = peerInstance.connect(PEER_ROOM_PREFIX + activeClan.code, {
+                reliable: true
+            });
+
+            setupPeerConnection(conn);
+
+            // If connection doesn't open within 3 seconds (host not present), elect this device as host
+            const connectionTimeout = setTimeout(() => {
+                if (activeConnections.length === 0) {
+                    try {
+                        peerInstance.destroy();
+                    } catch (e) {}
+                    becomeClanHost();
+                }
+            }, 3000);
+
+            conn.on('open', () => {
+                clearTimeout(connectionTimeout);
+            });
         });
 
-        peerInstance.on('open', (id) => {
-            updateCollabStatus(`Room active: ${currentRoomCode} (waiting for partner)`, 'hosting');
+        peerInstance.on('error', (err) => {
+            becomeClanHost();
+        });
+    } catch (e) {
+        console.error('Failed auto-connecting to clan:', e);
+        becomeClanHost();
+    }
+}
+
+/**
+ * Elects this client as the active host anchor for the clan room.
+ */
+function becomeClanHost() {
+    if (!activeClan || !activeClan.code) return;
+
+    if (peerInstance) {
+        try { peerInstance.destroy(); } catch (e) {}
+        peerInstance = null;
+    }
+
+    isHostingClan = true;
+
+    try {
+        peerInstance = new Peer(PEER_ROOM_PREFIX + activeClan.code, { debug: 1 });
+
+        peerInstance.on('open', () => {
+            updateCollabStatus(activeClan.name + ' (Online)', 'hosting');
             updateCollabModalUI();
         });
 
@@ -1380,91 +1569,38 @@ function startHosting() {
         });
 
         peerInstance.on('error', (err) => {
-            console.error('Peer host error:', err);
-            updateCollabStatus('Room connection error', 'offline');
-        });
-
-        peerInstance.on('close', () => {
-            disconnectCollab();
+            console.error('Host peer error:', err);
+            // Retry after delay if ID collision or network blip
+            clearTimeout(clanReconnectTimer);
+            clanReconnectTimer = setTimeout(autoConnectClan, 8000);
         });
     } catch (e) {
-        console.error('Failed to initialize peer hosting:', e);
-        updateCollabStatus('Failed to start room', 'offline');
+        console.error('Failed to become clan host:', e);
     }
 }
 
 /**
- * Connects this client to an existing hosted collaboration room using a room code.
- * @param {string} code - The 6-character room code.
- */
-function joinRoom(code) {
-    if (!code) return;
-    const cleanCode = code.trim().toUpperCase();
-    if (!cleanCode) return;
-
-    if (peerInstance) {
-        disconnectCollab();
-    }
-
-    currentRoomCode = cleanCode;
-    isHostingRoom = false;
-
-    updateCollabStatus(`Connecting to room ${cleanCode}...`, 'hosting');
-
-    try {
-        peerInstance = new Peer({
-            debug: 1
-        });
-
-        peerInstance.on('open', () => {
-            const conn = peerInstance.connect(PEER_ROOM_PREFIX + cleanCode, {
-                reliable: true
-            });
-            setupPeerConnection(conn);
-        });
-
-        peerInstance.on('error', (err) => {
-            console.error('Peer client connection error:', err);
-            updateCollabStatus('Could not connect to room', 'offline');
-        });
-
-        peerInstance.on('close', () => {
-            disconnectCollab();
-        });
-    } catch (e) {
-        console.error('Failed to join peer room:', e);
-        updateCollabStatus('Failed to join room', 'offline');
-    }
-}
-
-/**
- * Reads room code from the join input element and triggers join process.
- */
-function handleJoinFromInput() {
-    const input = document.getElementById('join-room-input');
-    if (input && input.value.trim()) {
-        joinRoom(input.value.trim());
-    }
-}
-
-/**
- * Sets up data and lifecycle event listeners for an incoming or outgoing peer connection.
- * @param {DataConnection} conn - The PeerJS data connection instance.
+ * Sets up listeners for a peer connection and exchanges initial clan notes snapshot.
+ * Transmits ONLY clan notes; personal notes are never shared.
+ * @param {DataConnection} conn - The PeerJS data connection.
  */
 function setupPeerConnection(conn) {
     conn.on('open', () => {
-        activeConnections.push(conn);
-        updateCollabStatus(`Connected (${activeConnections.length} collaborator)`, 'connected');
+        if (!activeConnections.includes(conn)) {
+            activeConnections.push(conn);
+        }
+
+        updateCollabStatus(activeClan ? activeClan.name + ' (Connected)' : 'Connected', 'connected');
         updateCollabModalUI();
 
-        // If hosting, transmit initial snapshot of all notes and sections
-        if (isHostingRoom) {
-            conn.send({
-                type: 'SYNC_ALL',
-                notes: notes,
-                sections: sections
-            });
-        }
+        // Transmit current clan notes snapshot (ONLY clan notes, personal notes excluded)
+        const clanNotes = notes.filter(n => isClanNote(n));
+        conn.send({
+            type: 'SYNC_CLAN',
+            clanName: activeClan ? activeClan.name : 'Shared Notes',
+            clanCode: activeClan ? activeClan.code : '',
+            notes: clanNotes
+        });
     });
 
     conn.on('data', (data) => {
@@ -1474,13 +1610,9 @@ function setupPeerConnection(conn) {
     conn.on('close', () => {
         activeConnections = activeConnections.filter(c => c !== conn);
         if (activeConnections.length === 0) {
-            if (isHostingRoom) {
-                updateCollabStatus(`Room active: ${currentRoomCode} (waiting for partner)`, 'hosting');
-            } else {
-                updateCollabStatus('Disconnected from room', 'offline');
-            }
+            updateCollabStatus(activeClan ? activeClan.name + ' (Online)' : 'Not Sharing', 'hosting');
         } else {
-            updateCollabStatus(`Connected (${activeConnections.length} collaborator)`, 'connected');
+            updateCollabStatus(activeClan ? activeClan.name + ' (Connected)' : 'Connected', 'connected');
         }
         updateCollabModalUI();
     });
@@ -1492,37 +1624,52 @@ function setupPeerConnection(conn) {
 
 /**
  * Handles incoming real-time synchronization payloads received from peer connections.
- * Merges updates into current editor view and writes to browser local storage.
+ * Merges clan updates without touching any of the user's private personal notes.
  * @param {Object} data - The message payload transmitted by a peer.
  */
 function handlePeerData(data) {
-    if (!data || !data.type) return;
+    if (!data || !data.type || !activeClan) return;
 
     isApplyingRemoteUpdate = true;
 
     try {
-        if (data.type === 'SYNC_ALL') {
-            // Initial synchronization of all notes and sections from host
-            if (Array.isArray(data.notes)) {
-                notes = data.notes;
-                localStorage.setItem('my-notes', JSON.stringify(notes));
+        if (data.type === 'SYNC_CLAN') {
+            // Update clan name if sent
+            if (data.clanName && activeClan.name !== data.clanName) {
+                activeClan.name = data.clanName;
+                localStorage.setItem('draftly-clan', JSON.stringify(activeClan));
             }
-            if (Array.isArray(data.sections)) {
-                sections = data.sections;
+
+            // Extract existing personal notes (must remain untouched)
+            const personalNotes = notes.filter(n => !isClanNote(n));
+
+            // Merge incoming clan notes
+            const incomingClanNotes = (data.notes || []).map(n => ({
+                ...n,
+                section: activeClan.name
+            }));
+
+            // Combine into unified notebook
+            notes = [...incomingClanNotes, ...personalNotes];
+            localStorage.setItem('my-notes', JSON.stringify(notes));
+
+            // Ensure clan section exists
+            if (!sections.includes(activeClan.name)) {
+                sections.push(activeClan.name);
                 localStorage.setItem('my-sections', JSON.stringify(sections));
             }
-            renderNotes();
-            if (notes.length > 0 && activeNoteIndex === null) {
-                loadNote(0);
-            }
-        } else if (data.type === 'NOTE_EDIT_LIVE') {
-            // Live typing update
-            if (typeof data.index === 'number' && notes[data.index]) {
-                notes[data.index].title = data.title;
-                notes[data.index].body = data.body;
 
-                // Update active editor inputs if viewing the edited note
-                if (activeNoteIndex === data.index) {
+            renderNotes();
+            updateCollabModalUI();
+        } else if (data.type === 'NOTE_EDIT_LIVE') {
+            // Live typing update for a clan note
+            const targetNote = notes.find(n => isClanNote(n) && n.date === data.date);
+            if (targetNote) {
+                targetNote.title = data.title;
+                targetNote.body = data.body;
+
+                // Update active editor inputs if viewing this note
+                if (activeNoteIndex !== null && notes[activeNoteIndex] === targetNote) {
                     const titleEl = document.getElementById('note-title');
                     const bodyEl = document.getElementById('note-body');
                     if (titleEl && titleEl.value !== data.title) {
@@ -1535,36 +1682,39 @@ function handlePeerData(data) {
                 renderNotes();
             }
         } else if (data.type === 'NOTE_SAVED') {
-            // Saved note state update
-            if (typeof data.index === 'number' && data.note) {
-                if (data.index < notes.length) {
-                    notes[data.index] = data.note;
+            // Saved clan note
+            if (data.note) {
+                const incomingNote = {
+                    ...data.note,
+                    section: activeClan.name
+                };
+
+                const existingIndex = notes.findIndex(n => isClanNote(n) && n.date === incomingNote.date);
+                if (existingIndex !== -1) {
+                    notes[existingIndex] = incomingNote;
                 } else {
-                    notes.unshift(data.note);
+                    notes.unshift(incomingNote);
                 }
+
                 localStorage.setItem('my-notes', JSON.stringify(notes));
                 renderNotes();
             }
         } else if (data.type === 'NOTE_DELETED') {
-            // Note removal event
-            if (typeof data.index === 'number' && data.index < notes.length) {
-                notes.splice(data.index, 1);
-                localStorage.setItem('my-notes', JSON.stringify(notes));
-                if (activeNoteIndex === data.index) {
-                    activeNoteIndex = null;
-                    document.getElementById('note-title').value = '';
-                    document.getElementById('note-body').innerHTML = '';
-                } else if (activeNoteIndex > data.index) {
-                    activeNoteIndex--;
+            // Removed clan note
+            if (data.date) {
+                const deleteIndex = notes.findIndex(n => isClanNote(n) && n.date === data.date);
+                if (deleteIndex !== -1) {
+                    notes.splice(deleteIndex, 1);
+                    localStorage.setItem('my-notes', JSON.stringify(notes));
+                    if (activeNoteIndex === deleteIndex) {
+                        activeNoteIndex = null;
+                        document.getElementById('note-title').value = '';
+                        document.getElementById('note-body').innerHTML = '';
+                    } else if (activeNoteIndex > deleteIndex) {
+                        activeNoteIndex--;
+                    }
+                    renderNotes();
                 }
-                renderNotes();
-            }
-        } else if (data.type === 'NOTE_MOVED') {
-            // Note sub-section branch movement
-            if (typeof data.index === 'number' && notes[data.index]) {
-                notes[data.index].section = data.section;
-                localStorage.setItem('my-notes', JSON.stringify(notes));
-                renderNotes();
             }
         }
     } finally {
@@ -1573,7 +1723,7 @@ function handlePeerData(data) {
 }
 
 /**
- * Broadcasts an event payload to all open active peer connections.
+ * Broadcasts an event payload to all open active peer connections in the clan.
  * @param {Object} message - The payload object to transmit.
  */
 function broadcastCollabMessage(message) {
@@ -1589,37 +1739,12 @@ function broadcastCollabMessage(message) {
 }
 
 /**
- * Disconnects all active peer connections, closes the peer instance, and resets UI.
- */
-function disconnectCollab() {
-    activeConnections.forEach(conn => {
-        try {
-            conn.close();
-        } catch (e) {}
-    });
-    activeConnections = [];
-
-    if (peerInstance) {
-        try {
-            peerInstance.destroy();
-        } catch (e) {}
-        peerInstance = null;
-    }
-
-    currentRoomCode = null;
-    isHostingRoom = false;
-
-    updateCollabStatus('Not Connected', 'offline');
-    updateCollabModalUI();
-}
-
-/**
- * Copies the full URL with the active room parameter to clipboard for 1-click joining.
+ * Copies the full URL with the active clan code parameter to clipboard for 1-click joining.
  */
 function copyCollabLink() {
-    if (!currentRoomCode) return;
+    if (!activeClan || !activeClan.code) return;
     const url = new URL(window.location.href);
-    url.searchParams.set('room', currentRoomCode);
+    url.searchParams.set('clan', activeClan.code);
     const shareUrl = url.toString();
 
     navigator.clipboard.writeText(shareUrl).then(() => {
@@ -1632,16 +1757,25 @@ function copyCollabLink() {
             }, 2000);
         }
     }).catch(() => {
-        window.prompt('Copy this collaboration link:', shareUrl);
+        window.prompt('Copy this invite link:', shareUrl);
     });
 }
 
-// Check URL query parameters for ?room=ROOMCODE on page launch
+// Check for persistent Clan membership on page launch and auto-connect
+if (activeClan && activeClan.code) {
+    updateCollabStatus(activeClan.name + ': Connecting...', 'hosting');
+    setTimeout(autoConnectClan, 300);
+} else {
+    updateCollabStatus('Not Sharing', 'offline');
+}
+updateCollabModalUI();
+
+// Check URL query parameters for ?clan=CODE or legacy ?room=CODE
 const urlParams = new URLSearchParams(window.location.search);
-const sharedRoomParam = urlParams.get('room');
-if (sharedRoomParam) {
+const sharedClanParam = urlParams.get('clan') || urlParams.get('room');
+if (sharedClanParam && (!activeClan || activeClan.code !== sharedClanParam)) {
     setTimeout(() => {
         openCollabModal();
-        joinRoom(sharedRoomParam);
+        joinClanByCode(sharedClanParam);
     }, 400);
 }
