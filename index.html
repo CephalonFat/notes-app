@@ -19,7 +19,7 @@
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
   <!-- Cache-busting version parameter to prevent GitHub Pages and mobile browsers from holding stale CSS -->
-  <link rel="stylesheet" href="style.css?v=1.2" />
+  <link rel="stylesheet" href="style.css?v=1.4" />
 </head>
 
 <body>
@@ -30,12 +30,14 @@
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-top">
-        <!-- Sidebar Header with Recents title, Add Section, and Real-Time Collaboration Button -->
+        <!-- Sidebar Header with Recents title, Add Section, and Persistent Clan Collaboration Button -->
         <div class="sidebar-header">
           <span class="sidebar-title">Recents</span>
           <div class="sidebar-header-actions">
-            <button id="collab-open-btn" class="sidebar-action-btn collab-header-btn" onclick="openCollabModal()" title="Real-Time Shared Notes">Share</button>
-            <button id="add-section-btn" class="sidebar-action-btn add-section-btn" onclick="promptCreateSection()" title="Create new sub-section">+ Section</button>
+            <button id="collab-open-btn" class="sidebar-action-btn collab-header-btn" onclick="openCollabModal()"
+              title="Share Notes">Share</button>
+            <button id="add-section-btn" class="sidebar-action-btn add-section-btn" onclick="promptCreateSection()"
+              title="Create new sub-section">+ Section</button>
           </div>
         </div>
 
@@ -66,11 +68,12 @@
 
       <!-- Top Right Header Badges (Live Shared Status & Version Badge) -->
       <div class="header-badges-row">
-        <div id="collab-status-badge" class="collab-status-badge" onclick="openCollabModal()" title="Shared Session Status">
+        <div id="collab-status-badge" class="collab-status-badge" onclick="openCollabModal()"
+          title="Shared Session Status">
           <span class="collab-status-dot"></span>
-          <span id="collab-status-text">Not Connected</span>
+          <span id="collab-status-text">Not Sharing</span>
         </div>
-        <div class="app-version-badge" title="Draftly Launch Version">v1.1</div>
+        <div class="app-version-badge" title="Draftly Launch Version">v1.2</div>
       </div>
 
       <button id="sidebar-toggle" onclick="toggleSidebar()">
@@ -142,7 +145,7 @@
 
           <div class="editor-colour-picker">
             <div class="colour-options" id="colour-options"></div>
-            <button id="more-colours-btn" onclick="openColorPickerModal()" title="Open Custom Color Picker">🎨</button>
+            <button id="more-colours-btn" onclick="openColorPickerModal()" title="Open Custom Color Picker">+</button>
           </div>
         </div>
 
@@ -161,11 +164,11 @@
           <div class="bullet-wrapper export-wrapper">
             <button id="export-btn" onclick="toggleExportMenu()" title="Export note options">Export ▾</button>
             <div class="bullet-menu export-menu" id="export-menu">
-              <button onclick="exportSingleNoteHTML(activeNoteIndex)">📄 Rich Document (.html / Word)</button>
-              <button onclick="exportSingleNoteTXT(activeNoteIndex)">📝 Clean Text (.txt)</button>
+              <button onclick="exportSingleNoteHTML(activeNoteIndex)">Rich Document (.html / Word)</button>
+              <button onclick="exportSingleNoteTXT(activeNoteIndex)">Clean Text (.txt)</button>
               <hr class="menu-divider">
-              <button onclick="exportAllNotesHTML()">📦 Export All as Rich Doc</button>
-              <button onclick="exportAllNotesTXT()">📦 Export All as Clean Text</button>
+              <button onclick="exportAllNotesHTML()">Export All as Rich Doc</button>
+              <button onclick="exportAllNotesTXT()">Export All as Clean Text</button>
             </div>
           </div>
         </div>
@@ -240,16 +243,16 @@
         <!-- Nav Tabs -->
         <nav class="settings-tabs">
           <button class="tab-btn active" data-tab="appearance" onclick="switchSettingsTab('appearance')">
-            <span>🎨 Theme & Style</span>
+            <span>Theme & Style</span>
           </button>
           <button class="tab-btn" data-tab="typography" onclick="switchSettingsTab('typography')">
-            <span>✍️ Typography</span>
+            <span>Typography</span>
           </button>
           <button class="tab-btn" data-tab="editor" onclick="switchSettingsTab('editor')">
-            <span>⚙️ Layout & Editor</span>
+            <span>Layout & Editor</span>
           </button>
           <button class="tab-btn" data-tab="data" onclick="switchSettingsTab('data')">
-            <span>💾 Data & Backup</span>
+            <span>Data & Backup</span>
           </button>
         </nav>
 
@@ -267,15 +270,15 @@
               <div class="theme-card-group">
                 <button class="theme-card-btn active" id="theme-card-light" onclick="setTheme('light')">
                   <span class="theme-preview light-preview"></span>
-                  <span>☀️ Light</span>
+                  <span>Light</span>
                 </button>
                 <button class="theme-card-btn" id="theme-card-dark" onclick="setTheme('dark')">
                   <span class="theme-preview dark-preview"></span>
-                  <span>🌙 Dark</span>
+                  <span>Dark</span>
                 </button>
                 <button class="theme-card-btn" id="theme-card-sepia" onclick="setTheme('sepia')">
                   <span class="theme-preview sepia-preview"></span>
-                  <span>📜 Sepia</span>
+                  <span>Sepia</span>
                 </button>
               </div>
             </div>
@@ -383,14 +386,14 @@
       </div>
     </div>
   </dialog>
- 
-  <!-- Real-Time Shared Notes Collaboration Dialog -->
+
+  <!-- Persistent Clan & Group Collaboration Dialog -->
   <dialog id="collab-modal" class="collab-dialog">
     <div class="collab-modal-container">
       <div class="collab-modal-header">
         <div class="collab-header-title">
-          <h3>Real-Time Shared Notes</h3>
-          <p class="collab-header-subtitle">Collaborate live with another person on your notes</p>
+          <h3>Share Notes</h3>
+          <p class="collab-header-subtitle">Sync group notes automatically while keeping personal notes private</p>
         </div>
         <button class="modal-close-btn" onclick="closeCollabModal()" title="Close dialog">✕</button>
       </div>
@@ -400,49 +403,74 @@
         <div class="collab-status-card" id="collab-status-card">
           <div class="status-indicator-row">
             <span class="collab-status-pulse" id="collab-status-pulse"></span>
-            <span class="collab-status-label" id="collab-status-detail">No active shared session</span>
+            <span class="collab-status-label" id="collab-status-detail">Not Sharing</span>
           </div>
-          <p class="collab-status-subtext" id="collab-status-subtext">Start a room or join with a room code to sync notes in real time.</p>
+          <p class="collab-status-subtext" id="collab-status-subtext">Start Sharing Notes. Personal
+            notes stay private on your device.</p>
         </div>
 
-        <!-- Host / Share Section -->
-        <div class="collab-section-card">
-          <h4 class="collab-card-title">Share Your Notes (Host Room)</h4>
-          <p class="collab-card-desc">Generate a secure room code and invite link to let someone edit notes with you live.</p>
-          
-          <div class="room-display-row" id="room-display-row" style="display: none;">
+        <!-- Dashboard View (Visible when actively in a Clan) -->
+        <div id="clan-dashboard-view" class="collab-section-card"
+          style="display: none; flex-direction: column; gap: 0.75rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span
+                style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600;">Shared
+                Group</span>
+              <h4 id="clan-dashboard-name"
+                style="font-size: 1.15rem; margin: 2px 0 0; color: var(--text-primary); font-weight: 700;">Shared Notes
+              </h4>
+            </div>
             <div class="room-code-badge">
-              <span class="room-code-label">Room Code:</span>
+              <span class="room-code-label">Code:</span>
               <span class="room-code-value" id="current-room-code">------</span>
             </div>
-            <button class="collab-action-btn primary-btn" id="copy-link-btn" onclick="copyCollabLink()">Copy Invite Link</button>
           </div>
-
+          <p class="collab-card-desc">Notes you're sharing automatically sync with members. Other sections remain
+            completely private.</p>
           <div class="collab-action-buttons">
-            <button class="collab-action-btn primary-btn" id="start-host-btn" onclick="startHosting()">Start Shared Session</button>
-            <button class="collab-action-btn danger-btn" id="disconnect-btn" onclick="disconnectCollab()" style="display: none;">Disconnect Session</button>
+            <button class="collab-action-btn primary-btn" id="copy-link-btn" onclick="copyCollabLink()">Copy Invite
+              Link</button>
+            <button class="collab-action-btn danger-btn" id="leave-clan-btn" onclick="confirmLeaveClan()">Stop Sharing
+            </button>
           </div>
         </div>
 
-        <!-- Join Section -->
-        <div class="collab-section-card" id="collab-join-card">
-          <h4 class="collab-card-title">Join a Shared Session</h4>
-          <p class="collab-card-desc">Enter a room code sent by a partner to connect directly to their shared notes.</p>
-          <div class="join-input-group">
-            <input type="text" id="join-room-input" class="join-room-input" placeholder="e.g. ABC123" maxlength="12" />
-            <button class="collab-action-btn primary-btn" onclick="handleJoinFromInput()">Join Room</button>
+        <!-- Setup / Join View (Visible when not currently in a Clan) -->
+        <div id="clan-setup-view" style="display: flex; flex-direction: column; gap: 0.85rem;">
+          <!-- Create Clan Card -->
+          <div class="collab-section-card">
+            <h4 class="collab-card-title">Start Sharing Notes</h4>
+            <p class="collab-card-desc">Start a persistent group folder for you and your team or friends.</p>
+            <div class="join-input-group">
+              <input type="text" id="create-clan-input" class="join-room-input"
+                placeholder="Group Name (e.g. Study Group)" maxlength="30" />
+              <button class="collab-action-btn primary-btn" onclick="handleCreateClan()">Create</button>
+            </div>
+          </div>
+
+          <!-- Join Clan Card -->
+          <div class="collab-section-card">
+            <h4 class="collab-card-title">Enter Code</h4>
+            <p class="collab-card-desc">Enter a 6-character code to connect to an existing group.</p>
+            <div class="join-input-group">
+              <input type="text" id="join-room-input" class="join-room-input" placeholder="e.g. ABC123"
+                maxlength="12" />
+              <button class="collab-action-btn primary-btn" onclick="handleJoinFromInput()">Connect</button>
+            </div>
           </div>
         </div>
 
         <div class="collab-footer-note">
-          <p>Notes stay stored in your browser local storage and sync directly over an encrypted peer-to-peer connection.</p>
+          <p>Notes stay stored in your browser local storage and sync directly over an encrypted peer-to-peer
+            connection.</p>
         </div>
       </div>
     </div>
   </dialog>
 
   <!-- Cache-busting version parameter for script updates -->
-  <script src="script.js?v=1.2"></script>
+  <script src="script.js?v=1.4"></script>
 
 </body>
 
