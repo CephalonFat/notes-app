@@ -1,8 +1,49 @@
- localStorage.getItem('theme') || 'light';
-let currentAccent = localStorage.getItem('accent') || 'blue';
-let currentLineHeight = localStorage.getItem('lineHeight') || '1.8';
-let currentPageWidth = localStorage.getItem('pageWidth') || '680px';
-let currentSpellcheck = localStorage.getItem('spellcheck') !== 'false';
+/**
+ * Safely retrieves an item from browser localStorage with exception handling.
+ * Prevents fatal SecurityError exceptions in restricted environments or private browsing.
+ * @param {string} key - The storage key to look up.
+ * @param {string|null} defaultValue - Fallback value if storage is inaccessible or key is absent.
+ * @returns {string|null} The retrieved string value or the provided fallback default.
+ */
+function safeStorageGet(key, defaultValue = null) {
+    try {
+        const val = localStorage.getItem(key);
+        return val !== null ? val : defaultValue;
+    } catch (e) {
+        return defaultValue;
+    }
+}
+
+/**
+ * Safely persists an item into browser localStorage with error trapping.
+ * @param {string} key - The storage key to assign.
+ * @param {string} value - The string content to save.
+ */
+function safeStorageSet(key, value) {
+    try {
+        localStorage.setItem(key, value);
+    } catch (e) {
+        console.warn('LocalStorage write restricted or unavailable:', e);
+    }
+}
+
+/**
+ * Safely removes an item from browser localStorage with error trapping.
+ * @param {string} key - The storage key to delete.
+ */
+function safeStorageRemove(key) {
+    try {
+        localStorage.removeItem(key);
+    } catch (e) {
+        console.warn('LocalStorage remove restricted or unavailable:', e);
+    }
+}
+
+let currentTheme = safeStorageGet('theme', 'light');
+let currentAccent = safeStorageGet('accent', 'blue');
+let currentLineHeight = safeStorageGet('lineHeight', '1.8');
+let currentPageWidth = safeStorageGet('pageWidth', '680px');
+let currentSpellcheck = safeStorageGet('spellcheck', 'true') !== 'false';
 
 function getDefaultColour() {
     if (currentTheme === 'dark') return '#e8e8e8';
@@ -20,11 +61,27 @@ let bulletsEnabled  = false;
 let currentBullet   = '•';
 
 // List of user-created notes from local storage
-let notes = JSON.parse(localStorage.getItem('my-notes') || '[]');
+let notes = [];
+try {
+    notes = JSON.parse(safeStorageGet('my-notes', '[]'));
+} catch (e) {
+    notes = [];
+}
 
 // Sidebar sub-sections list and collapsed state tracker
-let sections = JSON.parse(localStorage.getItem('my-sections') || '["General"]');
-let collapsedSections = JSON.parse(localStorage.getItem('collapsed-sections') || '{}');
+let sections = ['General'];
+try {
+    sections = JSON.parse(safeStorageGet('my-sections', '["General"]'));
+} catch (e) {
+    sections = ['General'];
+}
+
+let collapsedSections = {};
+try {
+    collapsedSections = JSON.parse(safeStorageGet('collapsed-sections', '{}'));
+} catch (e) {
+    collapsedSections = {};
+}
 let activeSection = 'General';
 
 // Prefix applied to clan room codes to prevent ID collisions on public PeerJS relay
@@ -33,7 +90,7 @@ const PEER_ROOM_PREFIX = 'draftly-clan-';
 // Active Clan membership profile loaded from browser local storage
 let activeClan = null;
 try {
-    activeClan = JSON.parse(localStorage.getItem('draftly-clan') || 'null');
+    activeClan = JSON.parse(safeStorageGet('draftly-clan', 'null'));
 } catch (e) {
     activeClan = null;
 }
@@ -1501,6 +1558,13 @@ function confirmLeaveClan() {
 function autoConnectClan() {
     if (!activeClan || !activeClan.code) return;
 
+    // Verify external PeerJS CDN library is loaded before attempting connection
+    if (typeof Peer === 'undefined') {
+        console.warn('PeerJS library unavailable or blocked by network. Operating in standalone mode.');
+        updateCollabStatus('Not Sharing', 'offline');
+        return;
+    }
+
     if (peerInstance) {
         try { peerInstance.destroy(); } catch (e) {}
         peerInstance = null;
@@ -1548,6 +1612,12 @@ function autoConnectClan() {
  */
 function becomeClanHost() {
     if (!activeClan || !activeClan.code) return;
+
+    // Verify external PeerJS CDN library is loaded
+    if (typeof Peer === 'undefined') {
+        console.warn('PeerJS library unavailable or blocked.');
+        return;
+    }
 
     if (peerInstance) {
         try { peerInstance.destroy(); } catch (e) {}
