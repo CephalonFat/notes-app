@@ -511,10 +511,11 @@ function loadNote(index) {
 function saveNote() {
     const title = document.getElementById('note-title').value.trim();
     const bodyEl = document.getElementById('note-body');
-    const bodyHtml = bodyEl.innerHTML;
-    const bodyText = bodyEl.innerText.trim();
+    const bodyHtml = bodyEl ? bodyEl.innerHTML : '';
+    const bodyText = bodyEl ? bodyEl.innerText.trim() : '';
 
-    if (!bodyText && !bodyHtml.includes('<img')) return;
+    // Do not save completely empty notes (must have title, body text, or embedded image)
+    if (!title && !bodyText && !bodyHtml.includes('<img')) return;
 
     // Retain existing assigned section or use currently active section
     const existingSection = (activeNoteIndex !== null && notes[activeNoteIndex]) 
@@ -562,8 +563,11 @@ function scheduleAutoSave() {
     if (isLoadingNote) return;
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => {
+        const titleEl = document.getElementById("note-title");
         const bodyEl = document.getElementById("note-body");
-        if (bodyEl && (bodyEl.innerText.trim() !== "" || bodyEl.innerHTML.includes('<img'))) {
+        const hasTitle = titleEl && titleEl.value.trim() !== "";
+        const hasBody = bodyEl && (bodyEl.innerText.trim() !== "" || bodyEl.innerHTML.includes('<img'));
+        if (hasTitle || hasBody) {
             saveNote();
         }
     }, 800);
@@ -571,9 +575,16 @@ function scheduleAutoSave() {
  
 /**
   * Handles live text input in the note editor.
+  * Initializes new shared notes immediately so live edits stream to peers from the first keystroke.
   * Triggers auto-save timer and broadcasts real-time keystroke updates to connected clan members.
   */
 function onEditorInput() {
+    // If typing in a new note inside the active shared section, initialize immediately
+    // so activeNoteIndex is assigned and live edits stream to collaborators from the first keystroke
+    if (activeNoteIndex === null && activeClan && activeSection === activeClan.name) {
+        saveNote();
+    }
+
     scheduleAutoSave();
 
     // Broadcast live typing only if editing a note inside the active shared clan section
@@ -1648,7 +1659,7 @@ function autoConnectClan() {
 
             setupPeerConnection(conn);
 
-            // If connection doesn't open within 3 seconds (host not present), elect this device as host
+            // If connection doesn't open within 6 seconds (host not present or slow ICE gathering), elect this device as host
             const connectionTimeout = setTimeout(() => {
                 if (activeConnections.length === 0) {
                     try {
@@ -1656,7 +1667,7 @@ function autoConnectClan() {
                     } catch (e) {}
                     becomeClanHost();
                 }
-            }, 3000);
+            }, 6000);
 
             conn.on('open', () => {
                 clearTimeout(connectionTimeout);
@@ -1739,7 +1750,7 @@ function setupPeerConnection(conn) {
     });
 
     conn.on('data', (data) => {
-        handlePeerData(data);
+        handlePeerData(data, conn);
     });
 
     conn.on('close', () => {
@@ -1762,8 +1773,17 @@ function setupPeerConnection(conn) {
  * Merges clan updates without touching any of the user's private personal notes.
  * @param {Object} data - The message payload transmitted by a peer.
  */
-function handlePeerData(data) {
+function handlePeerData(data, senderConn = null) {
     if (!data || !data.type || !activeClan) return;
+
+    // Relay to other connected peers if this client is hosting the room (enables multi-device mesh)
+    if (isHostingClan && activeConnections.length > 1) {
+        activeConnections.forEach(c => {
+            if (c && c.open && c !== senderConn) {
+                try { c.send(data); } catch (e) {}
+            }
+        });
+    }
 
     isApplyingRemoteUpdate = true;
 
@@ -1826,9 +1846,23 @@ function handlePeerData(data) {
                 }
             });
 
+            // Preserve reference to currently opened note across array rebuild
+            const currentActiveNote = (activeNoteIndex !== null && notes[activeNoteIndex]) ? notes[activeNoteIndex] : null;
+            const currentActiveId = currentActiveNote ? currentActiveNote.id : null;
+            const currentActiveDate = currentActiveNote ? currentActiveNote.date : null;
+
             // Combine into unified notebook
             notes = [...mergedClanNotes, ...personalNotes];
             safeStorageSet('my-notes', JSON.stringify(notes));
+
+            // Remap active note index in new notes array
+            if (currentActiveNote) {
+                const remappedIndex = notes.findIndex(n => 
+                    (currentActiveId && n.id === currentActiveId) || 
+                    (currentActiveDate && n.date === currentActiveDate)
+                );
+                activeNoteIndex = remappedIndex !== -1 ? remappedIndex : null;
+            }
 
             // Ensure clan section exists
             if (!sections.includes(activeClan.name)) {
@@ -1847,29 +1881,63 @@ function handlePeerData(data) {
                 targetNote = notes.find(n => isClanNote(n) && n.date === data.date);
             }
 
-            if (targetNote) {
+            // Content-based fallback if both ID and date fail
+            if (!targetNote) {
+                const incomingCk = (data.title || '').trim() + ':::' + (data.body || '').trim();
+                if (incomingCk !== ':::') {
+                    targetNote = notes.find(n => isClanNote(n) && ((n.title || '').trim() + ':::' + (n.body || '').trim()) === incomingCk);
+                }
+            }
+
+            // If note does not exist on this client yet, create it dynamically so typing streams immediately
+            if (!targetNote) {
+                targetNote = {
+                    id: data.id || generateNoteId(),
+                    title: data.title || '',
+                    body: data.body || '',
+                    date: data.date || new Date().toLocaleString(),
+                    font: "'Georgia', serif",
+                    fontSize: "1rem",
+                    colour: getDefaultColour(),
+                    section: activeClan.name
+                };
+                notes.unshift(targetNote);
+                if (activeNoteIndex !== null) {
+                    activeNoteIndex++;
+                }
+                safeStorageSet('my-notes', JSON.stringify(notes));
+            } else {
                 targetNote.title = data.title;
                 targetNote.body = data.body;
 
-                // Reconcile IDs if matched by date fallback so future lookups use matching IDs
+                // Reconcile IDs so future lookups use the exact same ID across devices
                 if (data.id && targetNote.id !== data.id) {
                     targetNote.id = data.id;
                     safeStorageSet('my-notes', JSON.stringify(notes));
                 }
-
-                // Update active editor inputs if viewing this note
-                if (activeNoteIndex !== null && notes[activeNoteIndex] === targetNote) {
-                    const titleEl = document.getElementById('note-title');
-                    const bodyEl = document.getElementById('note-body');
-                    if (titleEl && titleEl.value !== data.title) {
-                        titleEl.value = data.title;
-                    }
-                    if (bodyEl && bodyEl.innerHTML !== data.body) {
-                        bodyEl.innerHTML = data.body;
-                    }
-                }
-                renderNotes();
             }
+
+            // Check if user is currently viewing this note in the active editor
+            const isViewingThisNote = activeNoteIndex !== null && notes[activeNoteIndex] && (
+                notes[activeNoteIndex] === targetNote ||
+                (targetNote.id && notes[activeNoteIndex].id === targetNote.id) ||
+                (targetNote.date && notes[activeNoteIndex].date === targetNote.date)
+            );
+
+            if (isViewingThisNote) {
+                // Keep activeNoteIndex aligned with targetNote's position in notes array
+                activeNoteIndex = notes.indexOf(targetNote);
+
+                const titleEl = document.getElementById('note-title');
+                const bodyEl = document.getElementById('note-body');
+                if (titleEl && titleEl.value !== data.title) {
+                    titleEl.value = data.title;
+                }
+                if (bodyEl && bodyEl.innerHTML !== data.body) {
+                    bodyEl.innerHTML = data.body;
+                }
+            }
+            renderNotes();
         } else if (data.type === 'NOTE_SAVED') {
             // Saved clan note
             if (data.note) {
@@ -1879,22 +1947,41 @@ function handlePeerData(data) {
                     section: activeClan.name
                 };
 
-                // Match by unique persistent ID first, or fallback to exact matching
-                const existingIndex = notes.findIndex(n => isClanNote(n) && (
-                    (incomingNote.id && n.id === incomingNote.id) ||
-                    (!incomingNote.id && n.date === incomingNote.date) ||
-                    (!n.id && n.title === incomingNote.title && n.body === incomingNote.body)
-                ));
+                // Match by unique persistent ID first
+                let existingIndex = notes.findIndex(n => isClanNote(n) && incomingNote.id && n.id === incomingNote.id);
+
+                // Date-based fallback if ID match fails
+                if (existingIndex === -1 && incomingNote.date) {
+                    existingIndex = notes.findIndex(n => isClanNote(n) && n.date === incomingNote.date);
+                }
+
+                // Content-based fallback if both ID and date fail
+                if (existingIndex === -1) {
+                    const incomingCk = (incomingNote.title || '').trim() + ':::' + (incomingNote.body || '').trim();
+                    if (incomingCk !== ':::') {
+                        existingIndex = notes.findIndex(n => isClanNote(n) && ((n.title || '').trim() + ':::' + (n.body || '').trim()) === incomingCk);
+                    }
+                }
 
                 if (existingIndex !== -1) {
-                    // Update note in-place without creating a duplicate copy
+                    // Update note in-place without creating duplicate copies
                     notes[existingIndex] = {
                         ...notes[existingIndex],
-                        ...incomingNote
+                        ...incomingNote,
+                        id: incomingNote.id // Reconcile to sender's canonical ID
                     };
 
-                    // If currently viewing this note in editor, update editor view
-                    if (activeNoteIndex === existingIndex) {
+                    // Check if user is currently viewing this note in the active editor
+                    const isViewingSaved = activeNoteIndex !== null && (
+                        activeNoteIndex === existingIndex ||
+                        (notes[activeNoteIndex] && (
+                            (incomingNote.id && notes[activeNoteIndex].id === incomingNote.id) ||
+                            (incomingNote.date && notes[activeNoteIndex].date === incomingNote.date)
+                        ))
+                    );
+
+                    if (isViewingSaved) {
+                        activeNoteIndex = existingIndex;
                         const titleEl = document.getElementById('note-title');
                         const bodyEl = document.getElementById('note-body');
                         if (titleEl && titleEl.value !== incomingNote.title) {
@@ -1916,10 +2003,12 @@ function handlePeerData(data) {
                 renderNotes();
             }
         } else if (data.type === 'NOTE_DELETED') {
-            // Removed clan note matched by persistent ID or legacy date
-            const deleteIndex = notes.findIndex(n => isClanNote(n) && (
-                (data.id && n.id === data.id) || (data.date && n.date === data.date)
-            ));
+            // Match note to remove by persistent ID first, then fallback to date
+            let deleteIndex = notes.findIndex(n => isClanNote(n) && data.id && n.id === data.id);
+            if (deleteIndex === -1 && data.date) {
+                deleteIndex = notes.findIndex(n => isClanNote(n) && n.date === data.date);
+            }
+
             if (deleteIndex !== -1) {
                 notes.splice(deleteIndex, 1);
                 safeStorageSet('my-notes', JSON.stringify(notes));
