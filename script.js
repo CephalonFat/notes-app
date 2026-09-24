@@ -1778,31 +1778,51 @@ function handlePeerData(data) {
             // Extract existing personal notes (must remain untouched)
             const personalNotes = notes.filter(n => !isClanNote(n));
 
-            // Merge incoming clan notes with unique ID tracking
+            // Merge incoming clan notes with dual-key deduplication (ID + content)
+            // This handles the case where different devices generated different
+            // unique IDs for the same note during the migration to persistent IDs
             const incomingClanNotes = (data.notes || []).map(n => ({
                 ...n,
                 id: n.id || generateNoteId(),
                 section: activeClan.name
             }));
 
-            // Deduplicate incoming notes against existing clan notes by ID or content
-            const mergedClanNotes = [];
-            const seenKeys = new Set();
+            // Helper: content fingerprint for identifying identical notes across devices
+            function clanContentKey(n) {
+                return (n.title || '').trim() + ':::' + (n.body || '').trim();
+            }
 
+            const mergedClanNotes = [];
+            const seenIds = new Set();
+            const seenContent = new Set();
+
+            // First pass: add all incoming notes from peer and track both IDs and content
             incomingClanNotes.forEach(n => {
-                const key = n.id || (n.title + ':::' + n.body);
-                if (!seenKeys.has(key)) {
-                    seenKeys.add(key);
-                    mergedClanNotes.push(n);
-                }
+                if (n.id) seenIds.add(n.id);
+                seenContent.add(clanContentKey(n));
+                mergedClanNotes.push(n);
             });
 
-            // Retain existing local clan notes not present in incoming list
+            // Second pass: add local clan notes that are genuinely different from incoming
+            // Uses content-based matching as fallback when IDs differ across devices
             notes.filter(n => isClanNote(n)).forEach(localNote => {
-                const key = localNote.id || (localNote.title + ':::' + localNote.body);
-                if (!seenKeys.has(key)) {
-                    seenKeys.add(key);
+                const matchedById = localNote.id && seenIds.has(localNote.id);
+                const localCk = clanContentKey(localNote);
+                const matchedByContent = seenContent.has(localCk);
+
+                if (!matchedById && !matchedByContent) {
+                    // Genuinely unique local note not present in peer sync
+                    if (localNote.id) seenIds.add(localNote.id);
+                    seenContent.add(localCk);
                     mergedClanNotes.push(localNote);
+                } else if (matchedByContent && !matchedById && localNote.id) {
+                    // Same content exists from peer but with a different ID
+                    // Use deterministic tiebreaker (smaller ID wins) so both devices
+                    // converge to the same canonical ID regardless of sync order
+                    const peerNote = mergedClanNotes.find(n => clanContentKey(n) === localCk);
+                    if (peerNote && localNote.id < peerNote.id) {
+                        peerNote.id = localNote.id;
+                    }
                 }
             });
 
@@ -1819,14 +1839,23 @@ function handlePeerData(data) {
             renderNotes();
             updateCollabModalUI();
         } else if (data.type === 'NOTE_EDIT_LIVE') {
-            // Live typing update for a clan note matched by persistent ID or legacy date
-            const targetNote = notes.find(n => isClanNote(n) && (
-                (data.id && n.id === data.id) || (data.date && n.date === data.date)
-            ));
+            // Live typing update: match by persistent ID first, then date fallback
+            let targetNote = notes.find(n => isClanNote(n) && data.id && n.id === data.id);
+
+            // Date-based fallback if ID match fails (handles cross-device ID mismatch)
+            if (!targetNote && data.date) {
+                targetNote = notes.find(n => isClanNote(n) && n.date === data.date);
+            }
+
             if (targetNote) {
                 targetNote.title = data.title;
                 targetNote.body = data.body;
-                if (data.id && !targetNote.id) targetNote.id = data.id;
+
+                // Reconcile IDs if matched by date fallback so future lookups use matching IDs
+                if (data.id && targetNote.id !== data.id) {
+                    targetNote.id = data.id;
+                    safeStorageSet('my-notes', JSON.stringify(notes));
+                }
 
                 // Update active editor inputs if viewing this note
                 if (activeNoteIndex !== null && notes[activeNoteIndex] === targetNote) {
